@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { ShoppingCart, Volume2, VolumeX, RotateCcw, X, Play } from 'lucide-react';
+import { ShoppingCart, Volume2, VolumeX, RotateCcw, X, Play, Download, Upload } from 'lucide-react';
 import * as Dialog from '@radix-ui/react-dialog';
 import * as Tabs from '@radix-ui/react-tabs';
 
@@ -391,6 +391,48 @@ export default function Game() {
     }
   };
 
+  const importRef = useRef<HTMLInputElement>(null);
+
+  const exportSave = () => {
+    const json = JSON.stringify(state, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'doggo-clicker-save.json';
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const importSave = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const parsed = JSON.parse(ev.target?.result as string);
+        const merged: GameState = {
+          ...DEFAULT_STATE,
+          ...parsed,
+          upgrades: {
+            ...DEFAULT_STATE.upgrades,
+            ...parsed.upgrades,
+          },
+          unlockedThemes: parsed.unlockedThemes || DEFAULT_STATE.unlockedThemes,
+          unlockedSounds: parsed.unlockedSounds || DEFAULT_STATE.unlockedSounds,
+          rebirths: parsed.rebirths || 0,
+        };
+        setState(merged);
+        localStorage.setItem('doggoClickerState', JSON.stringify(merged));
+      } catch {
+        alert('Could not read save file — make sure it\'s a valid Doggo Clicker save.');
+      }
+    };
+    reader.readAsText(file);
+    // reset so the same file can be re-imported if needed
+    e.target.value = '';
+  };
+
   const rebirthThreshold = 1_000_000 * Math.pow(10, state.rebirths);
   const canRebirth = state.totalDoggosEarned >= rebirthThreshold;
 
@@ -429,6 +471,27 @@ export default function Game() {
           >
             <RotateCcw size={18} />
           </button>
+          <button
+            onClick={exportSave}
+            className="p-2 hover:bg-white/20 rounded-full transition-colors"
+            title="Export Save"
+          >
+            <Download size={18} />
+          </button>
+          <button
+            onClick={() => importRef.current?.click()}
+            className="p-2 hover:bg-white/20 rounded-full transition-colors"
+            title="Import Save"
+          >
+            <Upload size={18} />
+          </button>
+          <input
+            ref={importRef}
+            type="file"
+            accept=".json"
+            className="hidden"
+            onChange={importSave}
+          />
         </div>
         
         <div className="flex items-center gap-6">
