@@ -11,11 +11,21 @@ function formatNumber(n: number): string {
 }
 
 const CLICKERS = [
-  { id: 'doggo', emoji: '🐶', cost: 0, mult: 1, name: 'Doggo' },
-  { id: 'kitten', emoji: '🐱', cost: 1000, mult: 1.2, name: 'Kitten' },
-  { id: 'turtle', emoji: '🐢', cost: 10000, mult: 1.5, name: 'Turtle' },
-  { id: 'puffin', emoji: '🐧', cost: 100000, mult: 2, name: 'Puffin' },
-  { id: 'dodo', emoji: '🦤', cost: 5000000, mult: 5, name: 'Schafer Dodo', legendary: true },
+  { id: 'doggo',          emoji: '🐶', cost: 0,           mult: 1,    name: 'Doggo' },
+  { id: 'kitten',         emoji: '🐱', cost: 1_000,       mult: 1.2,  name: 'Kitten' },
+  { id: 'monkey',         emoji: '🐒', cost: 5_000,       mult: 1.35, name: 'Monkey' },
+  { id: 'turtle',         emoji: '🐢', cost: 10_000,      mult: 1.5,  name: 'Turtle' },
+  { id: 'lion',           emoji: '🦁', cost: 30_000,      mult: 1.65, name: 'Lion' },
+  { id: 'pufferfish',     emoji: '🐡', cost: 75_000,      mult: 1.85, name: 'Puffer Fish' },
+  { id: 'puffin',         emoji: '🐧', cost: 100_000,     mult: 2,    name: 'Puffin' },
+  { id: 'octopus',        emoji: '🐙', cost: 300_000,     mult: 2.3,  name: 'Octopus',      rare: true },
+  { id: 'axolotl',        emoji: '🦎', cost: 800_000,     mult: 2.8,  name: 'Axolotl',      rare: true },
+  { id: 'anglerfish',     emoji: '🐟', cost: 2_000_000,   mult: 3.5,  name: 'Angler Fish',  rare: true },
+  { id: 'dodo',           emoji: '🦤', cost: 5_000_000,   mult: 5,    name: 'Schafer Dodo', legendary: true },
+  { id: 'amanda-dodo',    emoji: '🦤', cost: 15_000_000,  mult: 7,    name: 'Amanda Dodo',  legendary: true },
+  { id: 'larus-dodo',     emoji: '🦤', cost: 50_000_000,  mult: 9,    name: 'Lárus Dodo',   legendary: true },
+  { id: 'rainbow-dodo',   emoji: '🦤', cost: 500_000_000, mult: 15,   name: 'Rainbow Dodo', impossible: true },
+  { id: 'golden-axolotl', emoji: '🦎', cost: 1_000_000_000, mult: 25, name: 'Golden Axolotl', impossible: true },
 ];
 
 const UPGRADES_META = {
@@ -300,11 +310,17 @@ export default function Game() {
           >
             <div 
               className={`text-[200px] leading-none select-none transition-transform duration-100 ${isBouncing ? 'scale-90' : 'scale-100 hover:scale-105 active:scale-95'}`}
-              style={{
+              style={!('impossible' in activeClickerDef && activeClickerDef.impossible) ? {
                 filter: 'drop-shadow(0 20px 30px rgba(0,0,0,0.15))',
-              }}
+              } : undefined}
             >
-              <div className={activeClickerDef.legendary ? 'animate-pulse drop-shadow-[0_0_40px_rgba(255,215,0,0.6)]' : ''}>
+              <div className={
+                'impossible' in activeClickerDef && activeClickerDef.impossible
+                  ? 'impossible-active-glow'
+                  : 'legendary' in activeClickerDef && activeClickerDef.legendary
+                    ? 'animate-pulse drop-shadow-[0_0_40px_rgba(255,215,0,0.6)]'
+                    : ''
+              }>
                 {activeClickerDef.emoji}
               </div>
             </div>
@@ -363,11 +379,21 @@ export default function Game() {
                       isActive ? 'border-primary bg-primary/5' : 
                       isUnlocked ? 'border-border hover:border-primary/30' : 
                       'border-border opacity-70 grayscale-[20%]'
-                    } ${c.legendary ? 'legendary-border overflow-visible' : ''}`}
+                    } ${'impossible' in c && c.impossible ? 'impossible-border overflow-visible' : 'legendary' in c && c.legendary ? 'legendary-border overflow-visible' : ''}`}
                   >
-                    {c.legendary && (
+                    {'impossible' in c && c.impossible && (
+                      <div className="absolute -top-4 -right-4 impossible-badge text-white text-xs font-black px-4 py-1.5 rounded-full shadow-lg transform rotate-6 border-2 border-white/40 z-10 whitespace-nowrap">
+                        ✦ IMPOSSIBLE
+                      </div>
+                    )}
+                    {'legendary' in c && c.legendary && !('impossible' in c && c.impossible) && (
                       <div className="absolute -top-4 -right-4 bg-[#FFD700] text-yellow-950 text-xs font-black px-4 py-1.5 rounded-full shadow-lg transform rotate-6 border-2 border-yellow-200 z-10 whitespace-nowrap">
                         ⭐ LEGENDARY
+                      </div>
+                    )}
+                    {'rare' in c && c.rare && (
+                      <div className="absolute -top-4 -right-4 bg-violet-500 text-white text-xs font-black px-4 py-1.5 rounded-full shadow-lg transform rotate-6 border-2 border-violet-300 z-10 whitespace-nowrap">
+                        ◆ RARE
                       </div>
                     )}
                     
@@ -427,6 +453,47 @@ export default function Game() {
         }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover {
           background: hsl(var(--muted-foreground) / 0.5);
+        }
+
+        /* Impossible tier — prismatic animated border */
+        @keyframes prismatic {
+          0%   { border-color: #ff4d4d; box-shadow: 0 0 18px 4px #ff4d4d88; }
+          14%  { border-color: #ff9900; box-shadow: 0 0 18px 4px #ff990088; }
+          28%  { border-color: #ffe600; box-shadow: 0 0 18px 4px #ffe60088; }
+          42%  { border-color: #33ff33; box-shadow: 0 0 18px 4px #33ff3388; }
+          57%  { border-color: #00ccff; box-shadow: 0 0 18px 4px #00ccff88; }
+          71%  { border-color: #8833ff; box-shadow: 0 0 18px 4px #8833ff88; }
+          85%  { border-color: #ff33cc; box-shadow: 0 0 18px 4px #ff33cc88; }
+          100% { border-color: #ff4d4d; box-shadow: 0 0 18px 4px #ff4d4d88; }
+        }
+        .impossible-border {
+          animation: prismatic 3s linear infinite;
+        }
+
+        /* Impossible badge gradient */
+        @keyframes badgeShift {
+          0%   { background-position: 0% 50%; }
+          100% { background-position: 200% 50%; }
+        }
+        .impossible-badge {
+          background: linear-gradient(90deg, #ff4d4d, #ff9900, #ffe600, #33ff33, #00ccff, #8833ff, #ff33cc, #ff4d4d);
+          background-size: 200% 100%;
+          animation: badgeShift 2.5s linear infinite;
+        }
+
+        /* Impossible active clicker glow */
+        @keyframes impossibleGlow {
+          0%   { filter: drop-shadow(0 0 30px #ff4d4d) drop-shadow(0 20px 30px rgba(0,0,0,0.15)); }
+          14%  { filter: drop-shadow(0 0 30px #ff9900) drop-shadow(0 20px 30px rgba(0,0,0,0.15)); }
+          28%  { filter: drop-shadow(0 0 30px #ffe600) drop-shadow(0 20px 30px rgba(0,0,0,0.15)); }
+          42%  { filter: drop-shadow(0 0 30px #33ff33) drop-shadow(0 20px 30px rgba(0,0,0,0.15)); }
+          57%  { filter: drop-shadow(0 0 30px #00ccff) drop-shadow(0 20px 30px rgba(0,0,0,0.15)); }
+          71%  { filter: drop-shadow(0 0 30px #8833ff) drop-shadow(0 20px 30px rgba(0,0,0,0.15)); }
+          85%  { filter: drop-shadow(0 0 30px #ff33cc) drop-shadow(0 20px 30px rgba(0,0,0,0.15)); }
+          100% { filter: drop-shadow(0 0 30px #ff4d4d) drop-shadow(0 20px 30px rgba(0,0,0,0.15)); }
+        }
+        .impossible-active-glow {
+          animation: impossibleGlow 3s linear infinite;
         }
       `}</style>
     </div>
