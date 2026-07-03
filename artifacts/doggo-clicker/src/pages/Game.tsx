@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
-import { ShoppingCart, Volume2, VolumeX, RotateCcw, X } from 'lucide-react';
+import { ShoppingCart, Volume2, VolumeX, RotateCcw, X, Play } from 'lucide-react';
 import * as Dialog from '@radix-ui/react-dialog';
+import * as Tabs from '@radix-ui/react-tabs';
 
 // Helper and Constants
 function formatNumber(n: number): string {
@@ -11,57 +12,102 @@ function formatNumber(n: number): string {
 }
 
 const CLICKERS = [
-  { id: 'doggo',          emoji: '🐶', cost: 0,           mult: 1,    name: 'Doggo' },
-  { id: 'kitten',         emoji: '🐱', cost: 1_000,       mult: 1.2,  name: 'Kitten' },
-  { id: 'monkey',         emoji: '🐒', cost: 5_000,       mult: 1.35, name: 'Monkey' },
-  { id: 'turtle',         emoji: '🐢', cost: 10_000,      mult: 1.5,  name: 'Turtle' },
-  { id: 'lion',           emoji: '🦁', cost: 30_000,      mult: 1.65, name: 'Lion' },
-  { id: 'pufferfish',     emoji: '🐡', cost: 75_000,      mult: 1.85, name: 'Puffer Fish' },
-  { id: 'puffin',         emoji: '🐧', cost: 100_000,     mult: 2,    name: 'Puffin' },
-  { id: 'octopus',        emoji: '🐙', cost: 300_000,     mult: 2.3,  name: 'Octopus',      rare: true },
-  { id: 'axolotl',        emoji: '🦎', cost: 800_000,     mult: 2.8,  name: 'Axolotl',      rare: true },
-  { id: 'anglerfish',     emoji: '🐟', cost: 2_000_000,   mult: 3.5,  name: 'Angler Fish',  rare: true },
-  { id: 'dodo',           emoji: '🦤', cost: 5_000_000,   mult: 5,    name: 'Schafer Dodo', legendary: true },
-  { id: 'amanda-dodo',    emoji: '🦤', cost: 15_000_000,  mult: 7,    name: 'Amanda Dodo',  legendary: true },
-  { id: 'larus-dodo',     emoji: '🦤', cost: 50_000_000,  mult: 9,    name: 'Lárus Dodo',   legendary: true },
-  { id: 'rainbow-dodo',   emoji: '🦤', cost: 500_000_000, mult: 15,   name: 'Rainbow Dodo', impossible: true },
-  { id: 'golden-axolotl', emoji: '🦎', cost: 1_000_000_000, mult: 25, name: 'Golden Axolotl', impossible: true },
+  { id: 'doggo',          cost: 0,           mult: 1,    name: 'Doggo' },
+  { id: 'kitten',         cost: 1_000,       mult: 1.2,  name: 'Kitten' },
+  { id: 'monkey',         cost: 5_000,       mult: 1.35, name: 'Monkey' },
+  { id: 'turtle',         cost: 10_000,      mult: 1.5,  name: 'Turtle' },
+  { id: 'lion',           cost: 30_000,      mult: 1.65, name: 'Lion' },
+  { id: 'pufferfish',     cost: 75_000,      mult: 1.85, name: 'Puffer Fish' },
+  { id: 'puffin',         cost: 100_000,     mult: 2,    name: 'Puffin' },
+  { id: 'octopus',        cost: 300_000,     mult: 2.3,  name: 'Octopus',      rare: true },
+  { id: 'axolotl',        cost: 800_000,     mult: 2.8,  name: 'Axolotl',      rare: true },
+  { id: 'anglerfish',     cost: 2_000_000,   mult: 3.5,  name: 'Angler Fish',  rare: true },
+  { id: 'dodo',           cost: 5_000_000,   mult: 5,    name: 'Schafer Dodo', legendary: true },
+  { id: 'amanda-dodo',    cost: 15_000_000,  mult: 7,    name: 'Amanda Dodo',  legendary: true },
+  { id: 'larus-dodo',     cost: 50_000_000,  mult: 9,    name: 'Lárus Dodo',   legendary: true },
+  { id: 'rainbow-dodo',   cost: 500_000_000, mult: 15,   name: 'Rainbow Dodo', impossible: true },
+  { id: 'golden-axolotl', cost: 1_000_000_000, mult: 25, name: 'Golden Axolotl', impossible: true },
 ];
 
 const UPGRADES_META = {
-  betterPetting: { name: "Better Petting", desc: "+1 Doggo per click", baseCost: 15, getCost: (lvl: number) => Math.floor(15 * Math.pow(1.15, lvl)) },
-  autoWalker: { name: "Auto-Walker", desc: "+0.5 Doggos/sec", baseCost: 50, getCost: (lvl: number) => Math.floor(50 * Math.pow(1.15, lvl)) },
-  treatDispenser: { name: "Treat Dispenser", desc: "+5 Doggos/sec", baseCost: 500, getCost: (lvl: number) => Math.floor(500 * Math.pow(1.15, lvl)) }
+  betterPetting:  { name: 'Better Petting',   desc: '+1 click per level',    emoji: '🐾', baseCost: 15,      getCost: (l:number) => Math.floor(15       * 1.15**l) },
+  autoWalker:     { name: 'Auto-Walker',      desc: '+0.5 Doggos/sec',       emoji: '🦮', baseCost: 50,      getCost: (l:number) => Math.floor(50       * 1.15**l) },
+  treatDispenser: { name: 'Treat Dispenser',  desc: '+5 Doggos/sec',         emoji: '🦴', baseCost: 500,     getCost: (l:number) => Math.floor(500      * 1.15**l) },
+  goldenLeash:    { name: 'Golden Leash',     desc: '+3 click per level',    emoji: '✨', baseCost: 2500,    getCost: (l:number) => Math.floor(2500     * 1.15**l) },
+  fetchTraining:  { name: 'Fetch Training',   desc: '+5 Doggos/sec',         emoji: '🎾', baseCost: 3500,    getCost: (l:number) => Math.floor(3500     * 1.15**l) },
+  biscuitFactory: { name: 'Biscuit Factory',  desc: '+25 Doggos/sec',        emoji: '🍪', baseCost: 12000,   getCost: (l:number) => Math.floor(12000    * 1.15**l) },
+  dogWhisperer:   { name: 'Dog Whisperer',    desc: '+100 Doggos/sec',       emoji: '🌟', baseCost: 75000,   getCost: (l:number) => Math.floor(75000    * 1.15**l) },
+  cosmicBone:     { name: 'Cosmic Bone',      desc: '+20 click +500 dps',    emoji: '💫', baseCost: 1000000, getCost: (l:number) => Math.floor(1000000  * 1.15**l) },
 };
+
+const THEMES = [
+  { id: 'classic', name: 'Classic Doggo', cost: 0,       palette: ['#FF9A3C','#FFF5E0','#E85D3A'] },
+  { id: 'night',   name: 'Night Howl',    cost: 5000,    palette: ['#6C63FF','#0D0D1A','#A78BFA'] },
+  { id: 'ocean',   name: 'Ocean Pup',     cost: 20000,   palette: ['#06B6D4','#E0F7FA','#0891B2'] },
+  { id: 'cherry',  name: 'Cherry Blossom',cost: 75000,   palette: ['#F472B6','#FFF0F6','#DB2777'] },
+  { id: 'forest',  name: 'Forest Paw',    cost: 200000,  palette: ['#22C55E','#F0FDF4','#15803D'] },
+  { id: 'void',    name: 'Void',          cost: 1000000, palette: ['#7C3AED','#0A0A14','#4C1D95'] },
+];
+
+const SOUNDS = [
+  { id: 'woofpop', name: 'Woof Pop',       cost: 0,       desc: 'A cheerful chirpy pop' },
+  { id: 'boing',   name: 'Boing',          cost: 10000,   desc: 'Springy and bouncy' },
+  { id: 'bark',    name: 'Bark',           cost: 30000,   desc: 'A sharp doggy bark' },
+  { id: 'squeak',  name: 'Squeak',         cost: 100000,  desc: 'Squeaky toy energy' },
+  { id: 'cosmic',  name: 'Cosmic',         cost: 500000,  desc: 'Spacey synth chord' },
+  { id: 'howl',    name: 'Legendary Howl', cost: 5000000, desc: 'Dramatic deep howl' },
+];
+
+interface UpgState { level: number; cost: number; }
 
 interface GameState {
   doggos: number;
   totalDoggosEarned: number;
   upgrades: {
-    betterPetting: { level: number; cost: number };
-    autoWalker: { level: number; cost: number };
-    treatDispenser: { level: number; cost: number };
+    betterPetting:  UpgState;
+    autoWalker:     UpgState;
+    treatDispenser: UpgState;
+    goldenLeash:    UpgState;
+    fetchTraining:  UpgState;
+    biscuitFactory: UpgState;
+    dogWhisperer:   UpgState;
+    cosmicBone:     UpgState;
   };
   unlockedClickers: string[];
   activeClicker: string;
   soundEnabled: boolean;
+  activeSound: string;
+  unlockedSounds: string[];
+  activeTheme: string;
+  unlockedThemes: string[];
+  rebirths: number;
 }
 
 const DEFAULT_STATE: GameState = {
   doggos: 0,
   totalDoggosEarned: 0,
   upgrades: {
-    betterPetting: { level: 0, cost: 15 },
-    autoWalker: { level: 0, cost: 50 },
-    treatDispenser: { level: 0, cost: 500 }
+    betterPetting:  { level: 0, cost: UPGRADES_META.betterPetting.baseCost },
+    autoWalker:     { level: 0, cost: UPGRADES_META.autoWalker.baseCost },
+    treatDispenser: { level: 0, cost: UPGRADES_META.treatDispenser.baseCost },
+    goldenLeash:    { level: 0, cost: UPGRADES_META.goldenLeash.baseCost },
+    fetchTraining:  { level: 0, cost: UPGRADES_META.fetchTraining.baseCost },
+    biscuitFactory: { level: 0, cost: UPGRADES_META.biscuitFactory.baseCost },
+    dogWhisperer:   { level: 0, cost: UPGRADES_META.dogWhisperer.baseCost },
+    cosmicBone:     { level: 0, cost: UPGRADES_META.cosmicBone.baseCost },
   },
   unlockedClickers: ['doggo'],
   activeClicker: 'doggo',
-  soundEnabled: true
+  soundEnabled: true,
+  activeSound: 'woofpop',
+  unlockedSounds: ['woofpop'],
+  activeTheme: 'classic',
+  unlockedThemes: ['classic'],
+  rebirths: 0,
 };
 
 let audioCtx: AudioContext | null = null;
-const playPop = () => {
+const playSound = (soundId: string) => {
   try {
     if (!audioCtx) {
       audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
@@ -69,21 +115,91 @@ const playPop = () => {
     if (audioCtx.state === 'suspended') {
       audioCtx.resume();
     }
-    const osc = audioCtx.createOscillator();
-    const gain = audioCtx.createGain();
-    
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(300, audioCtx.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(600, audioCtx.currentTime + 0.08);
-    
-    gain.gain.setValueAtTime(0, audioCtx.currentTime);
-    gain.gain.linearRampToValueAtTime(0.2, audioCtx.currentTime + 0.02);
-    gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.1);
-    
-    osc.connect(gain);
-    gain.connect(audioCtx.destination);
-    osc.start();
-    osc.stop(audioCtx.currentTime + 0.1);
+    const t = audioCtx.currentTime;
+
+    if (soundId === 'woofpop') {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(300, t);
+      osc.frequency.exponentialRampToValueAtTime(600, t + 0.08);
+      gain.gain.setValueAtTime(0, t);
+      gain.gain.linearRampToValueAtTime(0.2, t + 0.02);
+      gain.gain.linearRampToValueAtTime(0, t + 0.1);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start(t);
+      osc.stop(t + 0.1);
+    } else if (soundId === 'boing') {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(800, t);
+      osc.frequency.exponentialRampToValueAtTime(200, t + 0.4);
+      gain.gain.setValueAtTime(0, t);
+      gain.gain.linearRampToValueAtTime(0.3, t + 0.1);
+      gain.gain.linearRampToValueAtTime(0, t + 0.4);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start(t);
+      osc.stop(t + 0.4);
+    } else if (soundId === 'bark') {
+      const osc1 = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc1.type = 'sawtooth';
+      osc1.frequency.setValueAtTime(180, t);
+      osc1.frequency.exponentialRampToValueAtTime(120, t + 0.06);
+      gain.gain.setValueAtTime(0, t);
+      gain.gain.linearRampToValueAtTime(0.4, t + 0.02);
+      gain.gain.linearRampToValueAtTime(0, t + 0.08);
+      osc1.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc1.start(t);
+      osc1.stop(t + 0.08);
+    } else if (soundId === 'squeak') {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(2000, t);
+      osc.frequency.exponentialRampToValueAtTime(3000, t + 0.05);
+      gain.gain.setValueAtTime(0, t);
+      gain.gain.linearRampToValueAtTime(0.15, t + 0.02);
+      gain.gain.linearRampToValueAtTime(0, t + 0.08);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start(t);
+      osc.stop(t + 0.08);
+    } else if (soundId === 'cosmic') {
+      const freqs = [220, 261.6, 330];
+      freqs.forEach(f => {
+        const osc = audioCtx!.createOscillator();
+        const gain = audioCtx!.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(f, t);
+        gain.gain.setValueAtTime(0, t);
+        gain.gain.linearRampToValueAtTime(0.08, t + 0.05);
+        gain.gain.linearRampToValueAtTime(0, t + 0.3);
+        osc.connect(gain);
+        gain.connect(audioCtx!.destination);
+        osc.start(t);
+        osc.stop(t + 0.3);
+      });
+    } else if (soundId === 'howl') {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(80, t);
+      osc.frequency.linearRampToValueAtTime(140, t + 0.6);
+      osc.frequency.linearRampToValueAtTime(80, t + 1.2);
+      gain.gain.setValueAtTime(0, t);
+      gain.gain.linearRampToValueAtTime(0.3, t + 0.2);
+      gain.gain.linearRampToValueAtTime(0.3, t + 1.0);
+      gain.gain.linearRampToValueAtTime(0, t + 1.2);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start(t);
+      osc.stop(t + 1.2);
+    }
   } catch(e) {
     console.error("Audio error", e);
   }
@@ -97,9 +213,19 @@ export default function Game() {
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (parsed.upgrades && parsed.upgrades.betterPetting) {
-           return { ...DEFAULT_STATE, ...parsed };
-        }
+        return {
+          ...DEFAULT_STATE,
+          ...parsed,
+          upgrades: {
+            ...DEFAULT_STATE.upgrades,
+            ...(parsed.upgrades || {})
+          },
+          unlockedThemes: parsed.unlockedThemes || DEFAULT_STATE.unlockedThemes,
+          unlockedSounds: parsed.unlockedSounds || DEFAULT_STATE.unlockedSounds,
+          rebirths: parsed.rebirths || 0,
+          activeTheme: parsed.activeTheme || 'classic',
+          activeSound: parsed.activeSound || 'woofpop',
+        };
       } catch (e) {}
     }
     return DEFAULT_STATE;
@@ -117,26 +243,49 @@ export default function Game() {
     localStorage.setItem('doggoClickerState', JSON.stringify(state));
   }, [state]);
 
+  const rebirthMult = 1 + state.rebirths * 0.5;
+  const activeClickerDef = CLICKERS.find(c => c.id === state.activeClicker) || CLICKERS[0];
+
+  const clickValue = (
+    1
+    + state.upgrades.betterPetting.level
+    + state.upgrades.goldenLeash.level * 3
+    + state.upgrades.cosmicBone.level * 20
+  ) * activeClickerDef.mult * rebirthMult;
+
+  const dps = (
+    state.upgrades.autoWalker.level * 0.5
+    + state.upgrades.treatDispenser.level * 5
+    + state.upgrades.fetchTraining.level * 5
+    + state.upgrades.biscuitFactory.level * 25
+    + state.upgrades.dogWhisperer.level * 100
+    + state.upgrades.cosmicBone.level * 500
+  ) * rebirthMult;
+
   // Passive Income loop
   useEffect(() => {
     const interval = setInterval(() => {
       const s = stateRef.current;
-      const dps = s.upgrades.autoWalker.level * 0.5 + s.upgrades.treatDispenser.level * 5;
+      const currentRebirthMult = 1 + s.rebirths * 0.5;
+      const currentDps = (
+        s.upgrades.autoWalker.level * 0.5
+        + s.upgrades.treatDispenser.level * 5
+        + s.upgrades.fetchTraining.level * 5
+        + s.upgrades.biscuitFactory.level * 25
+        + s.upgrades.dogWhisperer.level * 100
+        + s.upgrades.cosmicBone.level * 500
+      ) * currentRebirthMult;
       
-      if (dps > 0) {
+      if (currentDps > 0) {
         setState(prev => ({
           ...prev,
-          doggos: prev.doggos + dps,
-          totalDoggosEarned: prev.totalDoggosEarned + dps
+          doggos: prev.doggos + currentDps,
+          totalDoggosEarned: prev.totalDoggosEarned + currentDps
         }));
       }
     }, 1000);
     return () => clearInterval(interval);
   }, []);
-
-  const dps = state.upgrades.autoWalker.level * 0.5 + state.upgrades.treatDispenser.level * 5;
-  const activeClickerDef = CLICKERS.find(c => c.id === state.activeClicker) || CLICKERS[0];
-  const clickValue = (1 + state.upgrades.betterPetting.level) * activeClickerDef.mult;
 
   const handleAnimalClick = (e: React.MouseEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
@@ -152,7 +301,7 @@ export default function Game() {
 
     setFloaters(prev => [...prev, { id, x, y, val: clickValue }]);
     
-    if (state.soundEnabled) playPop();
+    if (state.soundEnabled) playSound(state.activeSound);
 
     setIsBouncing(true);
     setTimeout(() => setIsBouncing(false), 150);
@@ -199,6 +348,42 @@ export default function Game() {
     setState(prev => ({ ...prev, activeClicker: clickerId }));
   };
 
+  const buyTheme = (themeId: string, cost: number) => {
+    setState(prev => {
+      if (!prev.unlockedThemes.includes(themeId) && prev.doggos >= cost) {
+        return {
+          ...prev,
+          doggos: prev.doggos - cost,
+          unlockedThemes: [...prev.unlockedThemes, themeId],
+          activeTheme: themeId
+        };
+      }
+      return prev;
+    });
+  };
+
+  const selectTheme = (themeId: string) => {
+    setState(prev => ({ ...prev, activeTheme: themeId }));
+  };
+
+  const buySound = (soundId: string, cost: number) => {
+    setState(prev => {
+      if (!prev.unlockedSounds.includes(soundId) && prev.doggos >= cost) {
+        return {
+          ...prev,
+          doggos: prev.doggos - cost,
+          unlockedSounds: [...prev.unlockedSounds, soundId],
+          activeSound: soundId
+        };
+      }
+      return prev;
+    });
+  };
+
+  const selectSound = (soundId: string) => {
+    setState(prev => ({ ...prev, activeSound: soundId }));
+  };
+
   const resetGame = () => {
     if (confirm("Are you sure you want to reset all progress?")) {
       setState(DEFAULT_STATE);
@@ -206,8 +391,32 @@ export default function Game() {
     }
   };
 
+  const rebirthThreshold = 1_000_000 * Math.pow(10, state.rebirths);
+  const canRebirth = state.totalDoggosEarned >= rebirthThreshold;
+
+  const performRebirth = () => {
+    if (confirm("Are you sure you want to rebirth? This will reset your doggos and upgrades, but grant a permanent +0.5x multiplier to all future earnings!")) {
+      setState(prev => ({
+        ...prev,
+        doggos: 0,
+        totalDoggosEarned: 0,
+        upgrades: {
+          betterPetting:  { level: 0, cost: UPGRADES_META.betterPetting.baseCost },
+          autoWalker:     { level: 0, cost: UPGRADES_META.autoWalker.baseCost },
+          treatDispenser: { level: 0, cost: UPGRADES_META.treatDispenser.baseCost },
+          goldenLeash:    { level: 0, cost: UPGRADES_META.goldenLeash.baseCost },
+          fetchTraining:  { level: 0, cost: UPGRADES_META.fetchTraining.baseCost },
+          biscuitFactory: { level: 0, cost: UPGRADES_META.biscuitFactory.baseCost },
+          dogWhisperer:   { level: 0, cost: UPGRADES_META.dogWhisperer.baseCost },
+          cosmicBone:     { level: 0, cost: UPGRADES_META.cosmicBone.baseCost },
+        },
+        rebirths: prev.rebirths + 1
+      }));
+    }
+  };
+
   return (
-    <div className="flex flex-col h-[100dvh] bg-background text-foreground overflow-hidden font-sans select-none">
+    <div className="flex flex-col h-[100dvh] bg-background text-foreground overflow-hidden font-sans select-none" data-theme={state.activeTheme}>
       {/* Top Bar */}
       <header className="flex items-center justify-between p-4 bg-primary text-primary-foreground shadow-md z-10 relative">
         <div className="flex items-center gap-3">
@@ -223,6 +432,22 @@ export default function Game() {
         </div>
         
         <div className="flex items-center gap-6">
+          {state.rebirths > 0 && (
+            <div className="flex flex-col items-center justify-center bg-white/20 px-3 py-1 rounded-lg">
+              <span className="text-xs font-bold uppercase opacity-90 tracking-wider">Rebirths</span>
+              <span className="text-sm font-black">⟳ {state.rebirths} · {rebirthMult}x</span>
+            </div>
+          )}
+
+          {canRebirth && (
+            <button 
+              onClick={performRebirth}
+              className="bg-purple-600 hover:bg-purple-500 text-white font-black px-4 py-2 rounded-xl shadow-[0_0_15px_rgba(147,51,234,0.6)] animate-pulse border-2 border-purple-300 transition-all active:scale-95"
+            >
+              Rebirth
+            </button>
+          )}
+
           <div className="flex flex-col items-end">
             <span className="text-sm font-bold opacity-80 uppercase tracking-widest">Doggos</span>
             <span className="text-3xl font-black tabular-nums leading-none" data-testid="text-doggos">
@@ -265,11 +490,14 @@ export default function Game() {
             return (
               <div key={key} className="bg-background rounded-2xl p-4 border-2 border-border shadow-sm flex flex-col gap-3">
                 <div className="flex justify-between items-start">
-                  <div>
-                    <h3 className="font-bold text-lg leading-tight">{meta.name}</h3>
-                    <p className="text-sm font-semibold text-muted-foreground mt-0.5">{meta.desc}</p>
+                  <div className="flex gap-2 items-center">
+                    <span className="text-2xl" aria-hidden="true">{meta.emoji}</span>
+                    <div>
+                      <h3 className="font-bold text-lg leading-tight">{meta.name}</h3>
+                      <p className="text-sm font-semibold text-muted-foreground mt-0.5">{meta.desc}</p>
+                    </div>
                   </div>
-                  <span className="bg-muted text-muted-foreground px-2.5 py-1 rounded-full text-xs font-black">
+                  <span className="bg-muted text-muted-foreground px-2.5 py-1 rounded-full text-xs font-black shrink-0 ml-2">
                     Lvl {upgState.level}
                   </span>
                 </div>
@@ -304,25 +532,27 @@ export default function Game() {
           </div>
 
           <div 
-            className="relative w-[340px] h-[340px] flex flex-col items-center justify-center cursor-pointer"
+            className="relative flex flex-col items-center justify-center cursor-pointer select-none"
             onClick={handleAnimalClick}
             data-testid="main-clicker"
           >
             <div 
-              className={`text-[200px] leading-none select-none transition-transform duration-100 ${isBouncing ? 'scale-90' : 'scale-100 hover:scale-105 active:scale-95'}`}
-              style={!('impossible' in activeClickerDef && activeClickerDef.impossible) ? {
-                filter: 'drop-shadow(0 20px 30px rgba(0,0,0,0.15))',
-              } : undefined}
-            >
-              <div className={
+              className={`w-56 h-56 md:w-72 md:h-72 rounded-full overflow-hidden border-[6px] border-border shadow-[0_20px_50px_rgba(0,0,0,0.15)] bg-white transition-transform duration-100 ${
+                isBouncing ? 'scale-90' : 'scale-100 hover:scale-105 active:scale-95'
+              } ${
                 'impossible' in activeClickerDef && activeClickerDef.impossible
-                  ? 'impossible-active-glow'
+                  ? 'impossible-active-glow border-none'
                   : 'legendary' in activeClickerDef && activeClickerDef.legendary
-                    ? 'animate-pulse drop-shadow-[0_0_40px_rgba(255,215,0,0.6)]'
+                    ? 'animate-pulse shadow-[0_0_60px_rgba(255,215,0,0.6)] border-yellow-400'
                     : ''
-              }>
-                {activeClickerDef.emoji}
-              </div>
+              }`}
+            >
+              <img 
+                src={`${import.meta.env.BASE_URL}animals/${activeClickerDef.id}.png`}
+                alt={activeClickerDef.name}
+                className="w-full h-full object-cover select-none pointer-events-none"
+                draggable={false}
+              />
             </div>
 
             {floaters.map(f => (
@@ -354,10 +584,10 @@ export default function Game() {
       <Dialog.Root open={shopOpen} onOpenChange={setShopOpen}>
         <Dialog.Portal>
           <Dialog.Overlay className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40" />
-          <Dialog.Content className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[90vw] max-w-2xl bg-card text-card-foreground rounded-[2rem] p-8 shadow-2xl z-50 border-4 border-border">
-            <div className="flex justify-between items-center mb-8">
+          <Dialog.Content className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[90vw] max-w-4xl bg-card text-card-foreground rounded-[2rem] p-8 shadow-2xl z-50 border-4 border-border flex flex-col max-h-[90vh]">
+            <div className="flex justify-between items-center mb-6 shrink-0">
               <h2 className="text-3xl font-black flex items-center gap-3">
-                <ShoppingCart className="text-accent" size={32} /> Clicker Shop
+                <ShoppingCart className="text-accent" size={32} /> Shop
               </h2>
               <Dialog.Close asChild>
                 <button className="p-3 bg-muted hover:bg-muted-foreground/20 rounded-full transition-colors">
@@ -366,76 +596,216 @@ export default function Game() {
               </Dialog.Close>
             </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5 max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
-              {CLICKERS.map(c => {
-                const isUnlocked = state.unlockedClickers.includes(c.id);
-                const isActive = state.activeClicker === c.id;
-                const canAfford = state.doggos >= c.cost;
-                
-                return (
-                  <div 
-                    key={c.id} 
-                    className={`relative p-5 rounded-3xl border-4 flex flex-col sm:flex-row items-center sm:items-start gap-4 transition-all ${
-                      isActive ? 'border-primary bg-primary/5' : 
-                      isUnlocked ? 'border-border hover:border-primary/30' : 
-                      'border-border opacity-70 grayscale-[20%]'
-                    } ${'impossible' in c && c.impossible ? 'impossible-border overflow-visible' : 'legendary' in c && c.legendary ? 'legendary-border overflow-visible' : ''}`}
-                  >
-                    {'impossible' in c && c.impossible && (
-                      <div className="absolute -top-4 -right-4 impossible-badge text-white text-xs font-black px-4 py-1.5 rounded-full shadow-lg transform rotate-6 border-2 border-white/40 z-10 whitespace-nowrap">
-                        ✦ IMPOSSIBLE
-                      </div>
-                    )}
-                    {'legendary' in c && c.legendary && !('impossible' in c && c.impossible) && (
-                      <div className="absolute -top-4 -right-4 bg-[#FFD700] text-yellow-950 text-xs font-black px-4 py-1.5 rounded-full shadow-lg transform rotate-6 border-2 border-yellow-200 z-10 whitespace-nowrap">
-                        ⭐ LEGENDARY
-                      </div>
-                    )}
-                    {'rare' in c && c.rare && (
-                      <div className="absolute -top-4 -right-4 bg-violet-500 text-white text-xs font-black px-4 py-1.5 rounded-full shadow-lg transform rotate-6 border-2 border-violet-300 z-10 whitespace-nowrap">
-                        ◆ RARE
-                      </div>
-                    )}
+            <Tabs.Root defaultValue="clickers" className="flex flex-col flex-1 min-h-0">
+              <Tabs.List className="flex border-b-2 border-border mb-6 shrink-0 gap-4">
+                <Tabs.Trigger value="clickers" className="px-6 py-3 font-black text-lg text-muted-foreground data-[state=active]:text-foreground data-[state=active]:border-b-4 data-[state=active]:border-primary transition-colors">
+                  Clickers
+                </Tabs.Trigger>
+                <Tabs.Trigger value="themes" className="px-6 py-3 font-black text-lg text-muted-foreground data-[state=active]:text-foreground data-[state=active]:border-b-4 data-[state=active]:border-primary transition-colors">
+                  Themes
+                </Tabs.Trigger>
+                <Tabs.Trigger value="sounds" className="px-6 py-3 font-black text-lg text-muted-foreground data-[state=active]:text-foreground data-[state=active]:border-b-4 data-[state=active]:border-primary transition-colors">
+                  Sounds
+                </Tabs.Trigger>
+              </Tabs.List>
+
+              <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar">
+                {/* Clickers Tab */}
+                <Tabs.Content value="clickers" className="grid grid-cols-1 md:grid-cols-2 gap-5 outline-none">
+                  {CLICKERS.map(c => {
+                    const isUnlocked = state.unlockedClickers.includes(c.id);
+                    const isActive = state.activeClicker === c.id;
+                    const canAfford = state.doggos >= c.cost;
                     
-                    <div className="text-6xl drop-shadow-md">
-                      {c.emoji}
-                    </div>
-                    
-                    <div className="flex-1 flex flex-col items-center sm:items-start w-full text-center sm:text-left">
-                      <h4 className="font-black text-xl">{c.name}</h4>
-                      <p className="text-sm font-bold text-muted-foreground mt-0.5">{c.mult}x Click Power</p>
-                      
-                      <div className="mt-4 w-full">
-                        {isActive ? (
-                          <span className="block bg-primary/20 text-primary px-4 py-2.5 rounded-xl text-sm font-black w-full text-center border-2 border-primary/30">
-                            Active
-                          </span>
-                        ) : isUnlocked ? (
-                          <button 
-                            onClick={() => selectClicker(c.id)}
-                            className="bg-secondary text-secondary-foreground hover:bg-secondary/80 w-full py-2.5 rounded-xl text-sm font-black transition-all border-2 border-secondary-foreground/20 active:scale-95"
-                          >
-                            Select
-                          </button>
-                        ) : (
-                          <button 
-                            onClick={() => buyClicker(c.id, c.cost)}
-                            disabled={!canAfford}
-                            className={`w-full py-2.5 rounded-xl text-sm font-black transition-all border-2 active:scale-95 ${
-                              canAfford 
-                                ? 'bg-primary text-primary-foreground border-primary-foreground/20 hover:brightness-110' 
-                                : 'bg-muted text-muted-foreground border-transparent cursor-not-allowed active:scale-100'
-                            }`}
-                          >
-                            Unlock: {formatNumber(c.cost)}
-                          </button>
+                    return (
+                      <div 
+                        key={c.id} 
+                        className={`relative p-5 rounded-3xl border-4 flex flex-col sm:flex-row items-center sm:items-start gap-4 transition-all ${
+                          isActive ? 'border-primary bg-primary/5' : 
+                          isUnlocked ? 'border-border hover:border-primary/30' : 
+                          'border-border opacity-70 grayscale-[20%]'
+                        } ${'impossible' in c && c.impossible ? 'impossible-border overflow-visible' : 'legendary' in c && c.legendary ? 'legendary-border overflow-visible' : ''}`}
+                      >
+                        {'impossible' in c && c.impossible && (
+                          <div className="absolute -top-4 -right-4 impossible-badge text-white text-xs font-black px-4 py-1.5 rounded-full shadow-lg transform rotate-6 border-2 border-white/40 z-10 whitespace-nowrap">
+                            ✦ IMPOSSIBLE
+                          </div>
                         )}
+                        {'legendary' in c && c.legendary && !('impossible' in c && c.impossible) && (
+                          <div className="absolute -top-4 -right-4 bg-[#FFD700] text-yellow-950 text-xs font-black px-4 py-1.5 rounded-full shadow-lg transform rotate-6 border-2 border-yellow-200 z-10 whitespace-nowrap">
+                            ⭐ LEGENDARY
+                          </div>
+                        )}
+                        {'rare' in c && c.rare && (
+                          <div className="absolute -top-4 -right-4 bg-violet-500 text-white text-xs font-black px-4 py-1.5 rounded-full shadow-lg transform rotate-6 border-2 border-violet-300 z-10 whitespace-nowrap">
+                            ◆ RARE
+                          </div>
+                        )}
+                        
+                        <div className="w-[80px] h-[80px] shrink-0 rounded-2xl overflow-hidden border-2 border-border shadow-md bg-white">
+                          <img 
+                            src={`${import.meta.env.BASE_URL}animals/${c.id}.png`} 
+                            alt={c.name}
+                            className="w-full h-full object-cover"
+                            draggable={false}
+                          />
+                        </div>
+                        
+                        <div className="flex-1 flex flex-col items-center sm:items-start w-full text-center sm:text-left">
+                          <h4 className="font-black text-xl">{c.name}</h4>
+                          <p className="text-sm font-bold text-muted-foreground mt-0.5">{c.mult}x Click Power</p>
+                          
+                          <div className="mt-4 w-full">
+                            {isActive ? (
+                              <span className="block bg-primary/20 text-primary px-4 py-2.5 rounded-xl text-sm font-black w-full text-center border-2 border-primary/30">
+                                Active
+                              </span>
+                            ) : isUnlocked ? (
+                              <button 
+                                onClick={() => selectClicker(c.id)}
+                                className="bg-secondary text-secondary-foreground hover:bg-secondary/80 w-full py-2.5 rounded-xl text-sm font-black transition-all border-2 border-secondary-foreground/20 active:scale-95"
+                              >
+                                Select
+                              </button>
+                            ) : (
+                              <button 
+                                onClick={() => buyClicker(c.id, c.cost)}
+                                disabled={!canAfford}
+                                className={`w-full py-2.5 rounded-xl text-sm font-black transition-all border-2 active:scale-95 ${
+                                  canAfford 
+                                    ? 'bg-primary text-primary-foreground border-primary-foreground/20 hover:brightness-110' 
+                                    : 'bg-muted text-muted-foreground border-transparent cursor-not-allowed active:scale-100'
+                                }`}
+                              >
+                                Unlock: {formatNumber(c.cost)}
+                              </button>
+                            )}
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+                    );
+                  })}
+                </Tabs.Content>
+
+                {/* Themes Tab */}
+                <Tabs.Content value="themes" className="grid grid-cols-1 md:grid-cols-2 gap-5 outline-none">
+                  {THEMES.map(t => {
+                    const isUnlocked = state.unlockedThemes.includes(t.id);
+                    const isActive = state.activeTheme === t.id;
+                    const canAfford = state.doggos >= t.cost;
+                    
+                    return (
+                      <div 
+                        key={t.id}
+                        className={`p-5 rounded-3xl border-4 flex flex-col sm:flex-row items-center sm:items-start gap-4 transition-all ${
+                          isActive ? 'border-primary bg-primary/5' : 
+                          isUnlocked ? 'border-border hover:border-primary/30' : 
+                          'border-border opacity-80'
+                        }`}
+                      >
+                        <div className="flex sm:flex-col gap-2 shrink-0 bg-white/10 p-3 rounded-2xl border-2 border-border/50">
+                          {t.palette.map((color, i) => (
+                            <div key={i} className="w-8 h-8 rounded-full shadow-sm border border-black/10" style={{ backgroundColor: color }} />
+                          ))}
+                        </div>
+
+                        <div className="flex-1 flex flex-col items-center sm:items-start w-full text-center sm:text-left">
+                          <h4 className="font-black text-xl">{t.name}</h4>
+                          <p className="text-sm font-bold text-muted-foreground mt-0.5">Color Theme</p>
+                          
+                          <div className="mt-4 w-full">
+                            {isActive ? (
+                              <span className="block bg-primary/20 text-primary px-4 py-2.5 rounded-xl text-sm font-black w-full text-center border-2 border-primary/30">
+                                Active
+                              </span>
+                            ) : isUnlocked ? (
+                              <button 
+                                onClick={() => selectTheme(t.id)}
+                                className="bg-secondary text-secondary-foreground hover:bg-secondary/80 w-full py-2.5 rounded-xl text-sm font-black transition-all border-2 border-secondary-foreground/20 active:scale-95"
+                              >
+                                Select
+                              </button>
+                            ) : (
+                              <button 
+                                onClick={() => buyTheme(t.id, t.cost)}
+                                disabled={!canAfford}
+                                className={`w-full py-2.5 rounded-xl text-sm font-black transition-all border-2 active:scale-95 ${
+                                  canAfford 
+                                    ? 'bg-primary text-primary-foreground border-primary-foreground/20 hover:brightness-110' 
+                                    : 'bg-muted text-muted-foreground border-transparent cursor-not-allowed active:scale-100'
+                                }`}
+                              >
+                                Unlock: {formatNumber(t.cost)}
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </Tabs.Content>
+
+                {/* Sounds Tab */}
+                <Tabs.Content value="sounds" className="flex flex-col gap-4 outline-none">
+                  {SOUNDS.map(s => {
+                    const isUnlocked = state.unlockedSounds.includes(s.id);
+                    const isActive = state.activeSound === s.id;
+                    const canAfford = state.doggos >= s.cost;
+
+                    return (
+                      <div 
+                        key={s.id}
+                        className={`p-4 rounded-2xl border-4 flex flex-col sm:flex-row items-center gap-4 transition-all ${
+                          isActive ? 'border-primary bg-primary/5' : 
+                          isUnlocked ? 'border-border hover:border-primary/30' : 
+                          'border-border opacity-80'
+                        }`}
+                      >
+                        <button 
+                          onClick={() => playSound(s.id)}
+                          className="w-12 h-12 shrink-0 flex items-center justify-center bg-accent text-accent-foreground rounded-full hover:scale-110 transition-transform shadow-md"
+                          title={`Preview ${s.name}`}
+                        >
+                          <Play size={20} className="ml-1" />
+                        </button>
+
+                        <div className="flex-1 flex flex-col items-center sm:items-start w-full text-center sm:text-left">
+                          <h4 className="font-black text-lg">{s.name}</h4>
+                          <p className="text-sm font-bold text-muted-foreground">{s.desc}</p>
+                        </div>
+
+                        <div className="w-full sm:w-auto shrink-0 mt-3 sm:mt-0 min-w-[140px]">
+                          {isActive ? (
+                            <span className="block bg-primary/20 text-primary px-4 py-2 rounded-xl text-sm font-black w-full text-center border-2 border-primary/30">
+                              Active
+                            </span>
+                          ) : isUnlocked ? (
+                            <button 
+                              onClick={() => selectSound(s.id)}
+                              className="bg-secondary text-secondary-foreground hover:bg-secondary/80 w-full py-2 rounded-xl text-sm font-black transition-all border-2 border-secondary-foreground/20 active:scale-95"
+                            >
+                              Select
+                            </button>
+                          ) : (
+                            <button 
+                              onClick={() => buySound(s.id, s.cost)}
+                              disabled={!canAfford}
+                              className={`w-full py-2 rounded-xl text-sm font-black transition-all border-2 active:scale-95 ${
+                                canAfford 
+                                  ? 'bg-primary text-primary-foreground border-primary-foreground/20 hover:brightness-110' 
+                                  : 'bg-muted text-muted-foreground border-transparent cursor-not-allowed active:scale-100'
+                              }`}
+                            >
+                              Unlock: {formatNumber(s.cost)}
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </Tabs.Content>
+              </div>
+            </Tabs.Root>
           </Dialog.Content>
         </Dialog.Portal>
       </Dialog.Root>
@@ -483,14 +853,14 @@ export default function Game() {
 
         /* Impossible active clicker glow */
         @keyframes impossibleGlow {
-          0%   { filter: drop-shadow(0 0 30px #ff4d4d) drop-shadow(0 20px 30px rgba(0,0,0,0.15)); }
-          14%  { filter: drop-shadow(0 0 30px #ff9900) drop-shadow(0 20px 30px rgba(0,0,0,0.15)); }
-          28%  { filter: drop-shadow(0 0 30px #ffe600) drop-shadow(0 20px 30px rgba(0,0,0,0.15)); }
-          42%  { filter: drop-shadow(0 0 30px #33ff33) drop-shadow(0 20px 30px rgba(0,0,0,0.15)); }
-          57%  { filter: drop-shadow(0 0 30px #00ccff) drop-shadow(0 20px 30px rgba(0,0,0,0.15)); }
-          71%  { filter: drop-shadow(0 0 30px #8833ff) drop-shadow(0 20px 30px rgba(0,0,0,0.15)); }
-          85%  { filter: drop-shadow(0 0 30px #ff33cc) drop-shadow(0 20px 30px rgba(0,0,0,0.15)); }
-          100% { filter: drop-shadow(0 0 30px #ff4d4d) drop-shadow(0 20px 30px rgba(0,0,0,0.15)); }
+          0%   { box-shadow: 0 0 40px #ff4d4d, 0 20px 50px rgba(0,0,0,0.2); }
+          14%  { box-shadow: 0 0 40px #ff9900, 0 20px 50px rgba(0,0,0,0.2); }
+          28%  { box-shadow: 0 0 40px #ffe600, 0 20px 50px rgba(0,0,0,0.2); }
+          42%  { box-shadow: 0 0 40px #33ff33, 0 20px 50px rgba(0,0,0,0.2); }
+          57%  { box-shadow: 0 0 40px #00ccff, 0 20px 50px rgba(0,0,0,0.2); }
+          71%  { box-shadow: 0 0 40px #8833ff, 0 20px 50px rgba(0,0,0,0.2); }
+          85%  { box-shadow: 0 0 40px #ff33cc, 0 20px 50px rgba(0,0,0,0.2); }
+          100% { box-shadow: 0 0 40px #ff4d4d, 0 20px 50px rgba(0,0,0,0.2); }
         }
         .impossible-active-glow {
           animation: impossibleGlow 3s linear infinite;
