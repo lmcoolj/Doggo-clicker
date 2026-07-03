@@ -1,0 +1,27 @@
+kind = "web"
+previewPath = "/"
+title = "Doggo Clicker"
+version = "1.0.0"
+id = "artifacts/doggo-clicker"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 18715
+
+[services.development]
+run = "pnpm --filter @workspace/doggo-clicker run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/doggo-clicker", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/doggo-clicker/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "18715"
+BASE_PATH = "/"
