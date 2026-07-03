@@ -251,4 +251,23 @@
     animation: rainbow-bg 3s ease infinite;
     color: #ffffff;
   }
+
+  @keyframes rain-fall {
+    0%   { transform: translateY(-80px) translateX(0)      rotate(0deg);   opacity: 1; }
+    80%  { opacity: 1; }
+    100% { transform: translateY(110vh) translateX(var(--drift)) rotate(360deg); opacity: 0; }
+  }
+
+  .rain-drop {
+    position: fixed;
+    top: 0;
+    border-radius: 50%;
+    object-fit: cover;
+    pointer-events: none;
+    z-index: 9999;
+    animation-name: rain-fall;
+    animation-timing-function: ease-in;
+    animation-fill-mode: both;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+  }
 }

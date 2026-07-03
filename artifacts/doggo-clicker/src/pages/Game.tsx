@@ -206,6 +206,7 @@ const playSound = (soundId: string) => {
 }
 
 type Floater = { id: number; x: number; y: number; val: number };
+type RainDrop = { id: number; x: number; size: number; duration: number; delay: number; drift: number; src: string };
 
 export default function Game() {
   const [state, setState] = useState<GameState>(() => {
@@ -234,6 +235,8 @@ export default function Game() {
   const [floaters, setFloaters] = useState<Floater[]>([]);
   const nextFloaterId = useRef(0);
   const [isBouncing, setIsBouncing] = useState(false);
+  const [rainDrops, setRainDrops] = useState<RainDrop[]>([]);
+  const nextRainId = useRef(0);
   const [shopOpen, setShopOpen] = useState(false);
   const stateRef = useRef(state);
   
@@ -300,6 +303,25 @@ export default function Game() {
     }));
 
     setFloaters(prev => [...prev, { id, x, y, val: clickValue }]);
+
+    // Spawn rain drops across the viewport
+    const src = `${import.meta.env.BASE_URL}animals/${activeClickerDef.id}.png`;
+    const count = 6;
+    const newDrops: RainDrop[] = Array.from({ length: count }, (_, i) => ({
+      id: nextRainId.current++,
+      x: Math.random() * 90 + 5,          // 5–95% of viewport width
+      size: Math.random() * 28 + 28,       // 28–56px
+      duration: Math.random() * 0.5 + 0.8, // 0.8–1.3s fall
+      delay: i * 0.06,                     // stagger each drop slightly
+      drift: (Math.random() - 0.5) * 60,  // horizontal drift px
+      src,
+    }));
+    setRainDrops(prev => [...prev, ...newDrops]);
+    const maxLifetime = (Math.max(...newDrops.map(d => d.delay + d.duration)) + 0.1) * 1000;
+    setTimeout(() => {
+      const ids = new Set(newDrops.map(d => d.id));
+      setRainDrops(prev => prev.filter(d => !ids.has(d.id)));
+    }, maxLifetime);
     
     if (state.soundEnabled) playSound(state.activeSound);
 
@@ -929,6 +951,25 @@ export default function Game() {
           animation: impossibleGlow 3s linear infinite;
         }
       `}</style>
+
+      {/* Rain drops — fixed overlay, pointer-events none */}
+      {rainDrops.map(drop => (
+        <img
+          key={drop.id}
+          src={drop.src}
+          alt=""
+          draggable={false}
+          className="rain-drop"
+          style={{
+            left: `${drop.x}vw`,
+            width: drop.size,
+            height: drop.size,
+            animationDuration: `${drop.duration}s`,
+            animationDelay: `${drop.delay}s`,
+            '--drift': `${drop.drift}px`,
+          } as React.CSSProperties}
+        />
+      ))}
     </div>
   );
 }
