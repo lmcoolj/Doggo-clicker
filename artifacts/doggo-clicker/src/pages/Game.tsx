@@ -267,7 +267,6 @@ export default function Game() {
   const [goldenSecondsLeft, setGoldenSecondsLeft] = useState(0);
   const goldenMultRef = useRef(1);          // 5 during event, 1 otherwise
   const goldenEventEndsAt = useRef(0);
-  const goldenSavedTheme = useRef('classic');
   
   // Persist and keep ref updated
   useEffect(() => {
@@ -321,30 +320,34 @@ export default function Game() {
     return () => clearInterval(interval);
   }, []);
 
-  // ── Golden Event: scheduling ────────────────────────────
+  // ── Golden Event: poll server so all players are in sync ──
   useEffect(() => {
-    let outerTimer: ReturnType<typeof setTimeout>;
-    let endTimer: ReturnType<typeof setTimeout>;
+    const poll = async () => {
+      try {
+        const res = await fetch('/api/golden-event');
+        if (!res.ok) return;
+        const data: { active: boolean; endsAt: number } = await res.json();
+        const currentlyActive = goldenMultRef.current === 5;
 
-    const scheduleNext = () => {
-      // Random 5–20 min gap between events
-      const delay = (5 * 60 + Math.random() * 15 * 60) * 1000;
-      outerTimer = setTimeout(() => {
-        goldenSavedTheme.current = stateRef.current.activeTheme;
-        goldenEventEndsAt.current = Date.now() + 3 * 60 * 1000;
-        goldenMultRef.current = 5;
-        setGoldenEventActive(true);
-
-        endTimer = setTimeout(() => {
+        if (data.active && !currentlyActive) {
+          goldenEventEndsAt.current = data.endsAt;
+          goldenMultRef.current = 5;
+          setGoldenEventActive(true);
+        } else if (!data.active && currentlyActive) {
           goldenMultRef.current = 1;
           setGoldenEventActive(false);
-          scheduleNext();
-        }, 3 * 60 * 1000);
-      }, delay);
+        } else if (data.active) {
+          // Keep end-time in sync with server
+          goldenEventEndsAt.current = data.endsAt;
+        }
+      } catch {
+        // Server unreachable — keep current client state
+      }
     };
 
-    scheduleNext();
-    return () => { clearTimeout(outerTimer); clearTimeout(endTimer); };
+    poll();
+    const interval = setInterval(poll, 5_000);
+    return () => clearInterval(interval);
   }, []);
 
   // ── Golden Event: continuous rain of golden pugs + axolotls
