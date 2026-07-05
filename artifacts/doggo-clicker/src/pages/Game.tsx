@@ -12,31 +12,43 @@ function formatNumber(n: number): string {
 }
 
 const CLICKERS = [
-  { id: 'doggo',          cost: 0,             mult: 1,    name: 'Doggo' },
-  { id: 'caterpillar',    cost: 500,            mult: 1.1,  name: 'Caterpillar' },
-  { id: 'kitten',         cost: 1_000,          mult: 1.2,  name: 'Kitten' },
-  { id: 'chicken',        cost: 2_500,          mult: 1.28, name: 'Chicken' },
-  { id: 'monkey',         cost: 5_000,          mult: 1.35, name: 'Monkey' },
-  { id: 'pug',            cost: 7_500,          mult: 1.42, name: 'Pug' },
-  { id: 'turtle',         cost: 10_000,         mult: 1.5,  name: 'Turtle' },
-  { id: 'fox',            cost: 15_000,         mult: 1.55, name: 'Fox' },
-  { id: 'bear',           cost: 20_000,         mult: 1.6,  name: 'Bear' },
-  { id: 'lion',           cost: 30_000,         mult: 1.65, name: 'Lion' },
-  { id: 'panda',          cost: 50_000,         mult: 1.75, name: 'Panda' },
-  { id: 'pufferfish',     cost: 75_000,         mult: 1.85, name: 'Puffer Fish' },
-  { id: 'toad',           cost: 125_000,        mult: 1.95, name: 'Toad' },
-  { id: 'puffin',         cost: 175_000,        mult: 2,    name: 'Puffin' },
-  { id: 'octopus',        cost: 300_000,        mult: 2.3,  name: 'Octopus',         rare: true },
-  { id: 'red-panda',      cost: 550_000,        mult: 2.55, name: 'Red Panda',       rare: true },
-  { id: 'axolotl',        cost: 800_000,        mult: 2.8,  name: 'Axolotl',         rare: true },
-  { id: 'chameleon',      cost: 1_200_000,      mult: 3.1,  name: 'Chameleon',       rare: true },
-  { id: 'toucan',         cost: 1_600_000,      mult: 3.3,  name: 'Tropical Toucan', rare: true },
-  { id: 'anglerfish',     cost: 2_000_000,      mult: 3.5,  name: 'Angler Fish',     rare: true },
-  { id: 'dodo',           cost: 5_000_000,      mult: 5,    name: 'Schafer Dodo',    legendary: true },
-  { id: 'amanda-dodo',    cost: 15_000_000,     mult: 7,    name: 'Amanda Dodo',     legendary: true },
-  { id: 'larus-dodo',     cost: 50_000_000,     mult: 9,    name: 'Lárus Dodo',      legendary: true },
-  { id: 'rainbow-dodo',   cost: 500_000_000,    mult: 15,   name: 'Rainbow Dodo',    impossible: true },
-  { id: 'golden-axolotl', cost: 1_000_000_000,  mult: 25,   name: 'Golden Axolotl', impossible: true },
+  { id: 'doggo',          cost: 0,                mult: 1,    name: 'Doggo' },
+  { id: 'caterpillar',    cost: 500,              mult: 1.1,  name: 'Caterpillar' },
+  { id: 'kitten',         cost: 1_000,            mult: 1.2,  name: 'Kitten' },
+  { id: 'chicken',        cost: 2_500,            mult: 1.28, name: 'Chicken' },
+  { id: 'monkey',         cost: 5_000,            mult: 1.35, name: 'Monkey' },
+  { id: 'pug',            cost: 7_500,            mult: 1.42, name: 'Pug' },
+  { id: 'scorpion',       cost: 8_500,            mult: 1.44, name: 'Scorpion' },
+  { id: 'turtle',         cost: 10_000,           mult: 1.5,  name: 'Turtle' },
+  { id: 'snake',          cost: 12_000,           mult: 1.52, name: 'Snake' },
+  { id: 'fox',            cost: 15_000,           mult: 1.55, name: 'Fox' },
+  { id: 'bear',           cost: 20_000,           mult: 1.6,  name: 'Bear' },
+  { id: 'bird',           cost: 25_000,           mult: 1.62, name: 'Bird' },
+  { id: 'lion',           cost: 30_000,           mult: 1.65, name: 'Lion' },
+  { id: 'kiwi',           cost: 40_000,           mult: 1.7,  name: 'Kiwi' },
+  { id: 'panda',          cost: 50_000,           mult: 1.75, name: 'Panda' },
+  { id: 'blue-jay',       cost: 60_000,           mult: 1.8,  name: 'Blue Jay' },
+  { id: 'pufferfish',     cost: 75_000,           mult: 1.85, name: 'Puffer Fish' },
+  { id: 'toad',           cost: 125_000,          mult: 1.95, name: 'Toad' },
+  { id: 'puffin',         cost: 175_000,          mult: 2,    name: 'Puffin' },
+  { id: 'dolphin',        cost: 220_000,          mult: 2.1,  name: 'Dolphin' },
+  { id: 'shark',          cost: 260_000,          mult: 2.2,  name: 'Shark' },
+  { id: 'octopus',        cost: 300_000,          mult: 2.3,  name: 'Octopus',         rare: true },
+  { id: 'blue-whale',     cost: 420_000,          mult: 2.45, name: 'Blue Whale',      rare: true },
+  { id: 'red-panda',      cost: 550_000,          mult: 2.55, name: 'Red Panda',       rare: true },
+  { id: 'flamingo',       cost: 650_000,          mult: 2.65, name: 'Flamingo',        rare: true },
+  { id: 'axolotl',        cost: 800_000,          mult: 2.8,  name: 'Axolotl',         rare: true },
+  { id: 'orca',           cost: 1_000_000,        mult: 3.0,  name: 'Orca',            rare: true },
+  { id: 'chameleon',      cost: 1_200_000,        mult: 3.1,  name: 'Chameleon',       rare: true },
+  { id: 'toucan',         cost: 1_600_000,        mult: 3.3,  name: 'Tropical Toucan', rare: true },
+  { id: 'anglerfish',     cost: 2_000_000,        mult: 3.5,  name: 'Angler Fish',     rare: true },
+  { id: 'ghost',          cost: 3_500_000,        mult: 4,    name: 'Ghost',           legendary: true },
+  { id: 'dodo',           cost: 5_000_000,        mult: 5,    name: 'Schafer Dodo',    legendary: true },
+  { id: 'amanda-dodo',    cost: 15_000_000,       mult: 7,    name: 'Amanda Dodo',     legendary: true },
+  { id: 'larus-dodo',     cost: 50_000_000,       mult: 9,    name: 'Lárus Dodo',      legendary: true },
+  { id: 'rainbow-dodo',   cost: 500_000_000,      mult: 15,   name: 'Rainbow Dodo',    impossible: true },
+  { id: 'golden-axolotl', cost: 1_000_000_000,    mult: 25,   name: 'Golden Axolotl', impossible: true },
+  { id: 'megalodon',      cost: 5_000_000_000,    mult: 40,   name: 'Megalodon',       impossible: true },
 ];
 
 const UPGRADES_META = {
@@ -216,7 +228,7 @@ const playSound = (soundId: string) => {
 }
 
 type Floater = { id: number; x: number; y: number; val: number };
-type RainDrop = { id: number; x: number; size: number; duration: number; delay: number; drift: number; src: string };
+type RainDrop = { id: number; x: number; size: number; duration: number; delay: number; drift: number; src: string; golden?: boolean };
 
 export default function Game() {
   const [state, setState] = useState<GameState>(() => {
@@ -249,6 +261,13 @@ export default function Game() {
   const nextRainId = useRef(0);
   const [shopOpen, setShopOpen] = useState(false);
   const stateRef = useRef(state);
+
+  // ── Golden Event ────────────────────────────────────────
+  const [goldenEventActive, setGoldenEventActive] = useState(false);
+  const [goldenSecondsLeft, setGoldenSecondsLeft] = useState(0);
+  const goldenMultRef = useRef(1);          // 5 during event, 1 otherwise
+  const goldenEventEndsAt = useRef(0);
+  const goldenSavedTheme = useRef('classic');
   
   // Persist and keep ref updated
   useEffect(() => {
@@ -258,13 +277,15 @@ export default function Game() {
 
   const rebirthMult = 1 + state.rebirths * 0.5;
   const activeClickerDef = CLICKERS.find(c => c.id === state.activeClicker) || CLICKERS[0];
+  const goldenMult = goldenEventActive ? 5 : 1;
+  goldenMultRef.current = goldenMult;
 
   const clickValue = (
     1
     + state.upgrades.betterPetting.level
     + state.upgrades.goldenLeash.level * 3
     + state.upgrades.cosmicBone.level * 20
-  ) * activeClickerDef.mult * rebirthMult;
+  ) * activeClickerDef.mult * rebirthMult * goldenMult;
 
   const dps = (
     state.upgrades.autoWalker.level * 0.5
@@ -273,7 +294,7 @@ export default function Game() {
     + state.upgrades.biscuitFactory.level * 25
     + state.upgrades.dogWhisperer.level * 100
     + state.upgrades.cosmicBone.level * 500
-  ) * rebirthMult;
+  ) * rebirthMult * goldenMult;
 
   // Passive Income loop
   useEffect(() => {
@@ -287,7 +308,7 @@ export default function Game() {
         + s.upgrades.biscuitFactory.level * 25
         + s.upgrades.dogWhisperer.level * 100
         + s.upgrades.cosmicBone.level * 500
-      ) * currentRebirthMult;
+      ) * currentRebirthMult * goldenMultRef.current;
       
       if (currentDps > 0) {
         setState(prev => ({
@@ -299,6 +320,72 @@ export default function Game() {
     }, 1000);
     return () => clearInterval(interval);
   }, []);
+
+  // ── Golden Event: scheduling ────────────────────────────
+  useEffect(() => {
+    let outerTimer: ReturnType<typeof setTimeout>;
+    let endTimer: ReturnType<typeof setTimeout>;
+
+    const scheduleNext = () => {
+      // Random 5–20 min gap between events
+      const delay = (5 * 60 + Math.random() * 15 * 60) * 1000;
+      outerTimer = setTimeout(() => {
+        goldenSavedTheme.current = stateRef.current.activeTheme;
+        goldenEventEndsAt.current = Date.now() + 3 * 60 * 1000;
+        goldenMultRef.current = 5;
+        setGoldenEventActive(true);
+
+        endTimer = setTimeout(() => {
+          goldenMultRef.current = 1;
+          setGoldenEventActive(false);
+          scheduleNext();
+        }, 3 * 60 * 1000);
+      }, delay);
+    };
+
+    scheduleNext();
+    return () => { clearTimeout(outerTimer); clearTimeout(endTimer); };
+  }, []);
+
+  // ── Golden Event: continuous rain of golden pugs + axolotls
+  useEffect(() => {
+    if (!goldenEventActive) return;
+    const BASE = import.meta.env.BASE_URL;
+    const srcs = [`${BASE}animals/pug.png`, `${BASE}animals/axolotl.png`];
+
+    const spawnGolden = () => {
+      const count = 5;
+      const drops: RainDrop[] = Array.from({ length: count }, (_, i) => ({
+        id: nextRainId.current++,
+        x: Math.random() * 90 + 5,
+        size: Math.random() * 26 + 30,
+        duration: Math.random() * 0.5 + 0.9,
+        delay: i * 0.09,
+        drift: (Math.random() - 0.5) * 80,
+        src: srcs[Math.floor(Math.random() * srcs.length)],
+        golden: true,
+      }));
+      setRainDrops(prev => [...prev, ...drops]);
+      const maxMs = (Math.max(...drops.map(d => d.delay + d.duration)) + 0.1) * 1000;
+      setTimeout(() => {
+        const ids = new Set(drops.map(d => d.id));
+        setRainDrops(prev => prev.filter(d => !ids.has(d.id)));
+      }, maxMs);
+    };
+
+    spawnGolden();
+    const interval = setInterval(spawnGolden, 700);
+    return () => clearInterval(interval);
+  }, [goldenEventActive]);
+
+  // ── Golden Event: countdown ticker ─────────────────────
+  useEffect(() => {
+    if (!goldenEventActive) { setGoldenSecondsLeft(0); return; }
+    const tick = () => setGoldenSecondsLeft(Math.max(0, Math.ceil((goldenEventEndsAt.current - Date.now()) / 1000)));
+    tick();
+    const interval = setInterval(tick, 1000);
+    return () => clearInterval(interval);
+  }, [goldenEventActive]);
 
   const handleAnimalClick = (e: React.MouseEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
@@ -490,7 +577,7 @@ export default function Game() {
   };
 
   return (
-    <div className="flex flex-col h-[100dvh] bg-background text-foreground overflow-hidden font-sans select-none" data-theme={state.activeTheme}>
+    <div className="flex flex-col h-[100dvh] bg-background text-foreground overflow-hidden font-sans select-none" data-theme={goldenEventActive ? 'golden' : state.activeTheme}>
       {/* Top Bar */}
       <header className="flex items-center justify-between p-4 bg-primary text-primary-foreground shadow-md z-10 relative">
         <div className="flex items-center gap-3">
@@ -962,6 +1049,18 @@ export default function Game() {
         }
       `}</style>
 
+      {/* Golden event banner */}
+      {goldenEventActive && (
+        <div className="golden-event-banner fixed top-0 left-0 right-0 z-[10000] bg-yellow-400 text-yellow-900 py-2 px-4 font-black text-sm flex items-center justify-center gap-3 pointer-events-none">
+          <span className="text-lg">✨</span>
+          <span>GOLDEN HOUR! 5× multiplier active!</span>
+          <span className="bg-yellow-700/25 px-3 py-0.5 rounded-full tabular-nums text-yellow-950 font-black">
+            {Math.floor(goldenSecondsLeft / 60)}:{String(goldenSecondsLeft % 60).padStart(2, '0')}
+          </span>
+          <span className="text-lg">✨</span>
+        </div>
+      )}
+
       {/* Rain drops — fixed overlay, pointer-events none */}
       {rainDrops.map(drop => (
         <img
@@ -969,7 +1068,7 @@ export default function Game() {
           src={drop.src}
           alt=""
           draggable={false}
-          className="rain-drop"
+          className={`rain-drop${drop.golden ? ' rain-drop-golden' : ''}`}
           style={{
             left: `${drop.x}vw`,
             width: drop.size,
@@ -977,6 +1076,7 @@ export default function Game() {
             animationDuration: `${drop.duration}s`,
             animationDelay: `${drop.delay}s`,
             '--drift': `${drop.drift}px`,
+            top: goldenEventActive ? '40px' : '0',
           } as React.CSSProperties}
         />
       ))}

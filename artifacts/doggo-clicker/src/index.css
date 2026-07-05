@@ -270,4 +270,36 @@
     animation-fill-mode: both;
     box-shadow: 0 4px 12px rgba(0,0,0,0.25);
   }
+
+  .rain-drop-golden {
+    filter: sepia(1) saturate(6) hue-rotate(8deg) brightness(1.2)
+            drop-shadow(0 0 8px rgba(255, 210, 0, 0.95));
+  }
+
+  /* ── Golden Event Theme ─────────────────────────────── */
+  [data-theme="golden"] {
+    --background: 47 100% 93%;
+    --foreground: 35 80% 12%;
+    --card: 46 100% 89%;
+    --card-foreground: 35 80% 12%;
+    --card-border: hsl(44 70% 72%);
+    --primary: 43 100% 47%;
+    --primary-foreground: 35 90% 8%;
+    --secondary: 44 80% 82%;
+    --secondary-foreground: 35 70% 20%;
+    --accent: 38 100% 42%;
+    --accent-foreground: 38 100% 96%;
+    --border: 44 65% 68%;
+    --muted: 46 60% 84%;
+    --muted-foreground: 35 35% 38%;
+  }
+
+  @keyframes golden-pulse {
+    0%, 100% { box-shadow: 0 0 20px rgba(255, 200, 0, 0.6), 0 0 40px rgba(255, 160, 0, 0.3); }
+    50%       { box-shadow: 0 0 40px rgba(255, 200, 0, 0.9), 0 0 80px rgba(255, 160, 0, 0.5); }
+  }
+
+  .golden-event-banner {
+    animation: golden-pulse 1.5s ease-in-out infinite;
+  }
 }
