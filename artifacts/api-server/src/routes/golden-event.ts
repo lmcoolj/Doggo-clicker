@@ -47,4 +47,22 @@ router.get("/golden-event", (_req, res) => {
   res.json(state);
 });
 
+// ── Admin: force-trigger a golden event immediately ───────────────────────────
+const ADMIN_PASSWORD = "tengir72";
+
+router.post("/admin/trigger-golden-event", (req, res) => {
+  const { password, checkOnly } = req.body as { password?: string; checkOnly?: boolean };
+  if (password !== ADMIN_PASSWORD) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+  if (checkOnly) {
+    // Password-validation only — no side effects
+    res.json({ ok: true });
+    return;
+  }
+  startEvent();
+  res.json({ ok: true, state });
+});
+
 export default router;

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { ShoppingCart, Volume2, VolumeX, RotateCcw, X, Play, Download, Upload } from 'lucide-react';
+import { ShoppingCart, Volume2, VolumeX, RotateCcw, X, Play, Download, Upload, Shield, Zap } from 'lucide-react';
 import * as Dialog from '@radix-ui/react-dialog';
 import * as Tabs from '@radix-ui/react-tabs';
 
@@ -260,6 +260,14 @@ export default function Game() {
   const [rainDrops, setRainDrops] = useState<RainDrop[]>([]);
   const nextRainId = useRef(0);
   const [shopOpen, setShopOpen] = useState(false);
+
+  // ── Admin Panel ──────────────────────────────────────────
+  const [adminOpen, setAdminOpen] = useState(false);
+  const [adminAuthed, setAdminAuthed] = useState(false);
+  const [adminPwInput, setAdminPwInput] = useState('');
+  const [adminPwError, setAdminPwError] = useState(false);
+  const [adminMsg, setAdminMsg] = useState<{ text: string; ok: boolean } | null>(null);
+  const adminVerifiedPw = useRef('');
   const stateRef = useRef(state);
 
   // ── Golden Event ────────────────────────────────────────
@@ -555,6 +563,49 @@ export default function Game() {
     e.target.value = '';
   };
 
+  // ── Admin handlers ───────────────────────────────────────
+  const adminLogin = async () => {
+    // Verify the password against the server — the client never stores a truth value
+    setAdminMsg(null);
+    try {
+      const res = await fetch('/api/admin/trigger-golden-event', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        // Use a no-op action flag so the server just validates without triggering
+        body: JSON.stringify({ password: adminPwInput, checkOnly: true }),
+      });
+      if (res.status === 401) {
+        setAdminPwError(true);
+        return;
+      }
+      // 200 means password accepted — store it and unlock the panel
+      adminVerifiedPw.current = adminPwInput;
+      setAdminAuthed(true);
+      setAdminPwError(false);
+      setAdminPwInput('');
+    } catch {
+      setAdminPwError(true);
+    }
+  };
+
+  const adminTriggerGolden = async () => {
+    setAdminMsg(null);
+    try {
+      const res = await fetch('/api/admin/trigger-golden-event', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: adminVerifiedPw.current }),
+      });
+      if (res.ok) {
+        setAdminMsg({ text: '✅ Golden Hour triggered for everyone!', ok: true });
+      } else {
+        setAdminMsg({ text: '❌ Server rejected the request.', ok: false });
+      }
+    } catch {
+      setAdminMsg({ text: '❌ Could not reach the server.', ok: false });
+    }
+  };
+
   const rebirthThreshold = 1_000_000 * Math.pow(10, state.rebirths);
   const canRebirth = state.totalDoggosEarned >= rebirthThreshold;
 
@@ -592,6 +643,13 @@ export default function Game() {
             data-testid="button-reset"
           >
             <RotateCcw size={18} />
+          </button>
+          <button
+            onClick={() => { setAdminOpen(true); setAdminMsg(null); }}
+            className="p-2 hover:bg-white/20 rounded-full transition-colors"
+            title="Admin Panel"
+          >
+            <Shield size={18} />
           </button>
           <button
             onClick={exportSave}
@@ -1063,6 +1121,69 @@ export default function Game() {
           <span className="text-lg">✨</span>
         </div>
       )}
+
+      {/* Admin Panel Modal */}
+      <Dialog.Root open={adminOpen} onOpenChange={(open) => { setAdminOpen(open); if (!open) { setAdminAuthed(false); setAdminPwInput(''); setAdminPwError(false); setAdminMsg(null); } }}>
+        <Dialog.Portal>
+          <Dialog.Overlay className="fixed inset-0 bg-black/60 z-[9000]" />
+          <Dialog.Content className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[9001] w-full max-w-sm bg-card rounded-2xl shadow-2xl p-6 flex flex-col gap-5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Shield size={22} className="text-primary" />
+                <Dialog.Title className="text-xl font-black">Admin Panel</Dialog.Title>
+              </div>
+              <Dialog.Close className="p-1.5 hover:bg-muted rounded-full transition-colors">
+                <X size={18} />
+              </Dialog.Close>
+            </div>
+
+            {!adminAuthed ? (
+              /* ── Password gate ── */
+              <div className="flex flex-col gap-3">
+                <p className="text-sm text-muted-foreground">Enter the admin password to continue.</p>
+                <input
+                  type="password"
+                  value={adminPwInput}
+                  onChange={e => { setAdminPwInput(e.target.value); setAdminPwError(false); }}
+                  onKeyDown={e => e.key === 'Enter' && adminLogin()}
+                  placeholder="Password"
+                  autoFocus
+                  className={`w-full px-4 py-2.5 rounded-xl border bg-background text-foreground outline-none transition-colors ${adminPwError ? 'border-red-500 focus:border-red-500' : 'border-border focus:border-primary'}`}
+                />
+                {adminPwError && <p className="text-xs text-red-500 font-semibold">Incorrect password.</p>}
+                <button
+                  onClick={adminLogin}
+                  className="w-full py-2.5 bg-primary text-primary-foreground font-black rounded-xl hover:opacity-90 active:scale-95 transition-all"
+                >
+                  Unlock
+                </button>
+              </div>
+            ) : (
+              /* ── Admin controls ── */
+              <div className="flex flex-col gap-4">
+                <div className="bg-muted rounded-xl p-4 flex flex-col gap-3">
+                  <div>
+                    <p className="font-black text-sm">🌟 Trigger Golden Hour</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">Starts a 3-minute Golden Hour (5× multiplier) for all players immediately.</p>
+                  </div>
+                  <button
+                    onClick={adminTriggerGolden}
+                    className="flex items-center justify-center gap-2 w-full py-2.5 bg-yellow-400 hover:bg-yellow-300 text-yellow-900 font-black rounded-xl active:scale-95 transition-all shadow"
+                  >
+                    <Zap size={18} />
+                    Trigger Golden Hour
+                  </button>
+                  {adminMsg && (
+                    <p className={`text-xs font-semibold text-center ${adminMsg.ok ? 'text-green-600' : 'text-red-500'}`}>
+                      {adminMsg.text}
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
 
       {/* Rain drops — fixed overlay, pointer-events none */}
       {rainDrops.map(drop => (
