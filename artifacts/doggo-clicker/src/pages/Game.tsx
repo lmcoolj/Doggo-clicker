@@ -80,6 +80,19 @@ const SOUNDS = [
   { id: 'howl',    name: 'Legendary Howl', cost: 5000000, desc: 'Dramatic deep howl' },
 ];
 
+// ── Golden Hour schedule (client-side; no server required) ─────────────────
+// Derived deterministically from the wall clock so every player enters Golden
+// Hour at the same real-world time. It runs for the first GOLDEN_DURATION_MS of
+// every GOLDEN_CYCLE_MS window — i.e. the first 3 minutes of each quarter-hour
+// (:00–:03, :15–:18, :30–:33, :45–:48 UTC).
+const GOLDEN_CYCLE_MS = 15 * 60 * 1000;
+const GOLDEN_DURATION_MS = 3 * 60 * 1000;
+
+// Admin gate for manually starting a Golden Hour. This is a toy game that runs
+// entirely in the browser, so the check is client-side (and therefore not a
+// real secret).
+const ADMIN_PASSWORD = 'tengir72';
+
 interface UpgState { level: number; cost: number; }
 
 interface GameState {
@@ -267,7 +280,6 @@ export default function Game() {
   const [adminPwInput, setAdminPwInput] = useState('');
   const [adminPwError, setAdminPwError] = useState(false);
   const [adminMsg, setAdminMsg] = useState<{ text: string; ok: boolean } | null>(null);
-  const adminVerifiedPw = useRef('');
   const stateRef = useRef(state);
 
   // ── Golden Event ────────────────────────────────────────
@@ -275,6 +287,7 @@ export default function Game() {
   const [goldenSecondsLeft, setGoldenSecondsLeft] = useState(0);
   const goldenMultRef = useRef(1);          // 5 during event, 1 otherwise
   const goldenEventEndsAt = useRef(0);
+  const goldenManualEndsAt = useRef(0);     // ms epoch; > now while an admin-triggered event runs
   
   // Persist and keep ref updated
   useEffect(() => {
@@ -328,33 +341,37 @@ export default function Game() {
     return () => clearInterval(interval);
   }, []);
 
-  // ── Golden Event: poll server so all players are in sync ──
+  // ── Golden Event: deterministic client-side schedule (+ manual admin trigger)
+  // No server needed — the schedule is a pure function of the wall clock, so
+  // every player is naturally in sync. An admin trigger can also force one on.
   useEffect(() => {
-    const poll = async () => {
-      try {
-        const res = await fetch('/api/golden-event');
-        if (!res.ok) return;
-        const data: { active: boolean; endsAt: number } = await res.json();
-        const currentlyActive = goldenMultRef.current === 5;
+    const evaluate = () => {
+      const now = Date.now();
+      const phase = now % GOLDEN_CYCLE_MS;
+      const scheduledActive = phase < GOLDEN_DURATION_MS;
+      const scheduledEndsAt = now - phase + GOLDEN_DURATION_MS;
+      const manualActive = goldenManualEndsAt.current > now;
 
-        if (data.active && !currentlyActive) {
-          goldenEventEndsAt.current = data.endsAt;
-          goldenMultRef.current = 5;
-          setGoldenEventActive(true);
-        } else if (!data.active && currentlyActive) {
-          goldenMultRef.current = 1;
-          setGoldenEventActive(false);
-        } else if (data.active) {
-          // Keep end-time in sync with server
-          goldenEventEndsAt.current = data.endsAt;
-        }
-      } catch {
-        // Server unreachable — keep current client state
+      const active = scheduledActive || manualActive;
+      const endsAt = manualActive
+        ? Math.max(scheduledEndsAt, goldenManualEndsAt.current)
+        : scheduledEndsAt;
+
+      const currentlyActive = goldenMultRef.current === 5;
+      if (active && !currentlyActive) {
+        goldenEventEndsAt.current = endsAt;
+        goldenMultRef.current = 5;
+        setGoldenEventActive(true);
+      } else if (!active && currentlyActive) {
+        goldenMultRef.current = 1;
+        setGoldenEventActive(false);
+      } else if (active) {
+        goldenEventEndsAt.current = endsAt;
       }
     };
 
-    poll();
-    const interval = setInterval(poll, 5_000);
+    evaluate();
+    const interval = setInterval(evaluate, 1_000);
     return () => clearInterval(interval);
   }, []);
 
@@ -563,47 +580,27 @@ export default function Game() {
     e.target.value = '';
   };
 
-  // ── Admin handlers ───────────────────────────────────────
-  const adminLogin = async () => {
-    // Verify the password against the server — the client never stores a truth value
+  // ── Admin handlers (client-side; a static site has no server) ────────────
+  const adminLogin = () => {
     setAdminMsg(null);
-    try {
-      const res = await fetch('/api/admin/trigger-golden-event', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        // Use a no-op action flag so the server just validates without triggering
-        body: JSON.stringify({ password: adminPwInput, checkOnly: true }),
-      });
-      if (res.status === 401) {
-        setAdminPwError(true);
-        return;
-      }
-      // 200 means password accepted — store it and unlock the panel
-      adminVerifiedPw.current = adminPwInput;
+    if (adminPwInput === ADMIN_PASSWORD) {
       setAdminAuthed(true);
       setAdminPwError(false);
       setAdminPwInput('');
-    } catch {
+    } else {
       setAdminPwError(true);
     }
   };
 
-  const adminTriggerGolden = async () => {
-    setAdminMsg(null);
-    try {
-      const res = await fetch('/api/admin/trigger-golden-event', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password: adminVerifiedPw.current }),
-      });
-      if (res.ok) {
-        setAdminMsg({ text: '✅ Golden Hour triggered for everyone!', ok: true });
-      } else {
-        setAdminMsg({ text: '❌ Server rejected the request.', ok: false });
-      }
-    } catch {
-      setAdminMsg({ text: '❌ Could not reach the server.', ok: false });
-    }
+  const adminTriggerGolden = () => {
+    // Start a Golden Hour right now for this player. The scheduled loop keeps it
+    // running until goldenManualEndsAt passes.
+    const endsAt = Date.now() + GOLDEN_DURATION_MS;
+    goldenManualEndsAt.current = endsAt;
+    goldenEventEndsAt.current = endsAt;
+    goldenMultRef.current = 5;
+    setGoldenEventActive(true);
+    setAdminMsg({ text: '✅ Golden Hour started! 5× for 3 minutes.', ok: true });
   };
 
   const rebirthThreshold = 1_000_000 * Math.pow(10, state.rebirths);
@@ -1164,7 +1161,7 @@ export default function Game() {
                 <div className="bg-muted rounded-xl p-4 flex flex-col gap-3">
                   <div>
                     <p className="font-black text-sm">🌟 Trigger Golden Hour</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">Starts a 3-minute Golden Hour (5× multiplier) for all players immediately.</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">Starts a 3-minute Golden Hour (5× multiplier) right now. It also runs automatically for the first 3 minutes of each quarter-hour.</p>
                   </div>
                   <button
                     onClick={adminTriggerGolden}
