@@ -118,18 +118,6 @@ const SOUNDS = [
   { id: 'howl',    name: 'Legendary Howl', cost: 5000000, desc: 'Dramatic deep howl' },
 ];
 
-// ── Events ("Hours") ─────────────────────────────────────────────────────────
-// Three escalating events. Each is better than the last. Timing lives on the
-// server (see api-server) so every player is in sync; the admin panel triggers
-// an event for everyone. The client just polls for the current event and renders
-// its multiplier, banner, rain, and theme.
-type EventId = 'golden' | 'rainbow' | 'galaxy';
-const EVENTS: Record<EventId, { name: string; emoji: string; mult: number; banner: string }> = {
-  golden:  { name: 'Golden Hour',  emoji: '✨', mult: 5,  banner: '5× multiplier active!' },
-  rainbow: { name: 'Rainbow Hour', emoji: '🌈', mult: 10, banner: '10× multiplier + rainbow rain!' },
-  galaxy:  { name: 'Galaxy Hour',  emoji: '🌌', mult: 20, banner: '20× multiplier · every animal rains!' },
-};
-
 interface UpgState { level: number; cost: number; }
 
 interface GameState {
@@ -280,7 +268,7 @@ const playSound = (soundId: string) => {
 }
 
 type Floater = { id: number; x: number; y: number; val: number };
-type RainDrop = { id: number; x: number; size: number; duration: number; delay: number; drift: number; src?: string; variant?: EventId };
+type RainDrop = { id: number; x: number; size: number; duration: number; delay: number; drift: number; src: string; golden?: boolean };
 
 export default function Game() {
   const [state, setState] = useState<GameState>(() => {
@@ -322,12 +310,11 @@ export default function Game() {
   const adminVerifiedPw = useRef('');
   const stateRef = useRef(state);
 
-  // ── Events (Golden / Rainbow / Galaxy Hour) — server-driven ─────────────
-  const [activeEvent, setActiveEvent] = useState<EventId | null>(null);
-  const [eventSecondsLeft, setEventSecondsLeft] = useState(0);
-  const eventMultRef = useRef(1);                       // current event multiplier (1 when none)
-  const eventRef = useRef<EventId | null>(null);        // current event id
-  const eventEndsAt = useRef(0);                        // ms epoch the current event ends
+  // ── Golden Event ────────────────────────────────────────
+  const [goldenEventActive, setGoldenEventActive] = useState(false);
+  const [goldenSecondsLeft, setGoldenSecondsLeft] = useState(0);
+  const goldenMultRef = useRef(1);          // 5 during event, 1 otherwise
+  const goldenEventEndsAt = useRef(0);
   
   // Persist and keep ref updated
   useEffect(() => {
@@ -337,8 +324,8 @@ export default function Game() {
 
   const rebirthMult = 1 + state.rebirths * 0.5;
   const activeClickerDef = CLICKERS.find(c => c.id === state.activeClicker) || CLICKERS[0];
-  const eventMult = activeEvent ? EVENTS[activeEvent].mult : 1;
-  eventMultRef.current = eventMult;
+  const goldenMult = goldenEventActive ? 5 : 1;
+  goldenMultRef.current = goldenMult;
 
   // ── Level & its perks ──────────────────────────────────────
   const { level, into: xpInto, need: xpNeed } = levelInfo(state.xp);
@@ -371,7 +358,7 @@ export default function Game() {
     + state.upgrades.betterPetting.level
     + state.upgrades.goldenLeash.level * 3
     + state.upgrades.cosmicBone.level * 20
-  ) * activeClickerDef.mult * rebirthMult * eventMult * levelMult;
+  ) * activeClickerDef.mult * rebirthMult * goldenMult * levelMult;
 
   const dps = (
     state.upgrades.autoWalker.level * 0.5
@@ -380,7 +367,7 @@ export default function Game() {
     + state.upgrades.biscuitFactory.level * 25
     + state.upgrades.dogWhisperer.level * 100
     + state.upgrades.cosmicBone.level * 500
-  ) * rebirthMult * eventMult * levelMult;
+  ) * rebirthMult * goldenMult * levelMult;
 
   // Passive Income loop
   useEffect(() => {
@@ -395,7 +382,7 @@ export default function Game() {
         + s.upgrades.biscuitFactory.level * 25
         + s.upgrades.dogWhisperer.level * 100
         + s.upgrades.cosmicBone.level * 500
-      ) * currentRebirthMult * eventMultRef.current * currentLevelMult;
+      ) * currentRebirthMult * goldenMultRef.current * currentLevelMult;
 
       if (currentDps > 0) {
         setState(prev => ({
@@ -409,63 +396,54 @@ export default function Game() {
     return () => clearInterval(interval);
   }, []);
 
-  // ── Events: poll the server so every player is in sync ──
-  // The server owns the schedule and the admin trigger, so an event started by
-  // the admin (or on the server's own timer) reaches everyone within a poll.
+  // ── Golden Event: poll server so all players are in sync ──
   useEffect(() => {
     const poll = async () => {
       try {
-        const res = await fetch('/api/events');
+        const res = await fetch('/api/golden-event');
         if (!res.ok) return;
-        const data: { active: boolean; event: EventId | null; endsAt: number } = await res.json();
-        const ev = data.active ? data.event : null;
+        const data: { active: boolean; endsAt: number } = await res.json();
+        const currentlyActive = goldenMultRef.current === 5;
 
-        if (ev !== eventRef.current) {
-          eventRef.current = ev;
-          eventEndsAt.current = data.endsAt || 0;
-          eventMultRef.current = ev ? EVENTS[ev].mult : 1;
-          setActiveEvent(ev);
-        } else if (ev) {
-          eventEndsAt.current = data.endsAt;
+        if (data.active && !currentlyActive) {
+          goldenEventEndsAt.current = data.endsAt;
+          goldenMultRef.current = 5;
+          setGoldenEventActive(true);
+        } else if (!data.active && currentlyActive) {
+          goldenMultRef.current = 1;
+          setGoldenEventActive(false);
+        } else if (data.active) {
+          // Keep end-time in sync with server
+          goldenEventEndsAt.current = data.endsAt;
         }
       } catch {
-        // Server unreachable — keep current state (no event)
+        // Server unreachable — keep current client state
       }
     };
 
     poll();
-    const interval = setInterval(poll, 3_000);
+    const interval = setInterval(poll, 5_000);
     return () => clearInterval(interval);
   }, []);
 
-  // ── Event rain: golden pups, rainbow droplets, or every animal (galaxy) ──
+  // ── Golden Event: continuous rain of golden pugs + axolotls
   useEffect(() => {
-    if (!activeEvent) return;
+    if (!goldenEventActive) return;
     const BASE = import.meta.env.BASE_URL;
-    const goldenSrcs = [`${BASE}animals/pug.png`, `${BASE}animals/axolotl.png`];
+    const srcs = [`${BASE}animals/pug.png`, `${BASE}animals/axolotl.png`];
 
-    const spawn = () => {
-      const count = activeEvent === 'golden' ? 5 : 6;
-      const drops: RainDrop[] = Array.from({ length: count }, (_, i) => {
-        const base: RainDrop = {
-          id: nextRainId.current++,
-          x: Math.random() * 90 + 5,
-          size: Math.random() * 26 + 30,
-          duration: Math.random() * 0.5 + 0.9,
-          delay: i * 0.09,
-          drift: (Math.random() - 0.5) * 80,
-          variant: activeEvent,
-        };
-        if (activeEvent === 'golden') {
-          return { ...base, src: goldenSrcs[Math.floor(Math.random() * goldenSrcs.length)] };
-        }
-        if (activeEvent === 'galaxy') {
-          // Galaxy Hour rains every animal — pick a random one per drop
-          const c = CLICKERS[Math.floor(Math.random() * CLICKERS.length)];
-          return { ...base, src: `${BASE}animals/${c.id}.png` };
-        }
-        return base; // rainbow: no image — a CSS rainbow droplet
-      });
+    const spawnGolden = () => {
+      const count = 5;
+      const drops: RainDrop[] = Array.from({ length: count }, (_, i) => ({
+        id: nextRainId.current++,
+        x: Math.random() * 90 + 5,
+        size: Math.random() * 26 + 30,
+        duration: Math.random() * 0.5 + 0.9,
+        delay: i * 0.09,
+        drift: (Math.random() - 0.5) * 80,
+        src: srcs[Math.floor(Math.random() * srcs.length)],
+        golden: true,
+      }));
       setRainDrops(prev => [...prev, ...drops]);
       const maxMs = (Math.max(...drops.map(d => d.delay + d.duration)) + 0.1) * 1000;
       setTimeout(() => {
@@ -474,19 +452,19 @@ export default function Game() {
       }, maxMs);
     };
 
-    spawn();
-    const interval = setInterval(spawn, 650);
+    spawnGolden();
+    const interval = setInterval(spawnGolden, 700);
     return () => clearInterval(interval);
-  }, [activeEvent]);
+  }, [goldenEventActive]);
 
-  // ── Event: countdown ticker ────────────────────────────
+  // ── Golden Event: countdown ticker ─────────────────────
   useEffect(() => {
-    if (!activeEvent) { setEventSecondsLeft(0); return; }
-    const tick = () => setEventSecondsLeft(Math.max(0, Math.ceil((eventEndsAt.current - Date.now()) / 1000)));
+    if (!goldenEventActive) { setGoldenSecondsLeft(0); return; }
+    const tick = () => setGoldenSecondsLeft(Math.max(0, Math.ceil((goldenEventEndsAt.current - Date.now()) / 1000)));
     tick();
     const interval = setInterval(tick, 1000);
     return () => clearInterval(interval);
-  }, [activeEvent]);
+  }, [goldenEventActive]);
 
   const handleAnimalClick = (e: React.MouseEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
@@ -658,20 +636,22 @@ export default function Game() {
     e.target.value = '';
   };
 
-  // ── Admin handlers (verified against the server) ─────────────────────────
+  // ── Admin handlers ───────────────────────────────────────
   const adminLogin = async () => {
+    // Verify the password against the server — the client never stores a truth value
     setAdminMsg(null);
     try {
-      const res = await fetch('/api/admin/trigger-event', {
+      const res = await fetch('/api/admin/trigger-golden-event', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        // Validate the password without triggering anything
+        // Use a no-op action flag so the server just validates without triggering
         body: JSON.stringify({ password: adminPwInput, checkOnly: true }),
       });
       if (res.status === 401) {
         setAdminPwError(true);
         return;
       }
+      // 200 means password accepted — store it and unlock the panel
       adminVerifiedPw.current = adminPwInput;
       setAdminAuthed(true);
       setAdminPwError(false);
@@ -681,16 +661,16 @@ export default function Game() {
     }
   };
 
-  const triggerEvent = async (id: EventId) => {
+  const adminTriggerGolden = async () => {
     setAdminMsg(null);
     try {
-      const res = await fetch('/api/admin/trigger-event', {
+      const res = await fetch('/api/admin/trigger-golden-event', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password: adminVerifiedPw.current, event: id }),
+        body: JSON.stringify({ password: adminVerifiedPw.current }),
       });
       if (res.ok) {
-        setAdminMsg({ text: `✅ ${EVENTS[id].name} triggered for everyone!`, ok: true });
+        setAdminMsg({ text: '✅ Golden Hour triggered for everyone!', ok: true });
       } else {
         setAdminMsg({ text: '❌ Server rejected the request.', ok: false });
       }
@@ -724,7 +704,7 @@ export default function Game() {
   };
 
   return (
-    <div className="flex flex-col h-[100dvh] bg-background text-foreground overflow-hidden font-sans select-none" data-theme={activeEvent ?? state.activeTheme}>
+    <div className="flex flex-col h-[100dvh] bg-background text-foreground overflow-hidden font-sans select-none" data-theme={goldenEventActive ? 'golden' : state.activeTheme}>
       {/* Top Bar */}
       <header className="flex items-center justify-between p-4 bg-primary text-primary-foreground shadow-md z-10 relative">
         <div className="flex items-center gap-3">
@@ -1219,21 +1199,15 @@ export default function Game() {
         }
       `}</style>
 
-      {/* Event banner */}
-      {activeEvent && (
-        <div className={`fixed top-0 left-0 right-0 z-[10000] py-2 px-4 font-black text-sm flex items-center justify-center gap-3 pointer-events-none ${
-          activeEvent === 'golden' ? 'golden-event-banner bg-yellow-400 text-yellow-900'
-          : activeEvent === 'rainbow' ? 'event-banner-rainbow text-white'
-          : 'event-banner-galaxy text-white'
-        }`}>
-          <span className="text-lg">{EVENTS[activeEvent].emoji}</span>
-          <span className="uppercase tracking-wide" style={{ textShadow: '0 1px 3px rgba(0,0,0,0.35)' }}>
-            {EVENTS[activeEvent].name}! {EVENTS[activeEvent].banner}
+      {/* Golden event banner */}
+      {goldenEventActive && (
+        <div className="golden-event-banner fixed top-0 left-0 right-0 z-[10000] bg-yellow-400 text-yellow-900 py-2 px-4 font-black text-sm flex items-center justify-center gap-3 pointer-events-none">
+          <span className="text-lg">✨</span>
+          <span>GOLDEN HOUR! 5× multiplier active!</span>
+          <span className="bg-yellow-700/25 px-3 py-0.5 rounded-full tabular-nums text-yellow-950 font-black">
+            {Math.floor(goldenSecondsLeft / 60)}:{String(goldenSecondsLeft % 60).padStart(2, '0')}
           </span>
-          <span className="bg-black/25 px-3 py-0.5 rounded-full tabular-nums font-black">
-            {Math.floor(eventSecondsLeft / 60)}:{String(eventSecondsLeft % 60).padStart(2, '0')}
-          </span>
-          <span className="text-lg">{EVENTS[activeEvent].emoji}</span>
+          <span className="text-lg">✨</span>
         </div>
       )}
 
@@ -1278,23 +1252,16 @@ export default function Game() {
               <div className="flex flex-col gap-4">
                 <div className="bg-muted rounded-xl p-4 flex flex-col gap-3">
                   <div>
-                    <p className="font-black text-sm">⚡ Trigger an Event</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">Starts a 3-minute event for all players immediately. Events also occur on their own at random.</p>
+                    <p className="font-black text-sm">🌟 Trigger Golden Hour</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">Starts a 3-minute Golden Hour (5× multiplier) for all players immediately.</p>
                   </div>
-                  {(Object.keys(EVENTS) as EventId[]).map(id => (
-                    <button
-                      key={id}
-                      onClick={() => triggerEvent(id)}
-                      className={`flex items-center justify-center gap-2 w-full py-2.5 font-black rounded-xl active:scale-95 transition-all shadow ${
-                        id === 'golden' ? 'bg-yellow-400 hover:bg-yellow-300 text-yellow-900'
-                        : id === 'rainbow' ? 'event-banner-rainbow text-white'
-                        : 'event-banner-galaxy text-white'
-                      }`}
-                    >
-                      <Zap size={18} />
-                      {EVENTS[id].emoji} {EVENTS[id].name} · {EVENTS[id].mult}×
-                    </button>
-                  ))}
+                  <button
+                    onClick={adminTriggerGolden}
+                    className="flex items-center justify-center gap-2 w-full py-2.5 bg-yellow-400 hover:bg-yellow-300 text-yellow-900 font-black rounded-xl active:scale-95 transition-all shadow"
+                  >
+                    <Zap size={18} />
+                    Trigger Golden Hour
+                  </button>
                   {adminMsg && (
                     <p className={`text-xs font-semibold text-center ${adminMsg.ok ? 'text-green-600' : 'text-red-500'}`}>
                       {adminMsg.text}
@@ -1308,23 +1275,24 @@ export default function Game() {
       </Dialog.Root>
 
       {/* Rain drops — fixed overlay, pointer-events none */}
-      {rainDrops.map(drop => {
-        const style = {
-          left: `${drop.x}vw`,
-          width: drop.size,
-          height: drop.size,
-          animationDuration: `${drop.duration}s`,
-          animationDelay: `${drop.delay}s`,
-          '--drift': `${drop.drift}px`,
-          top: activeEvent ? '40px' : '0',
-        } as React.CSSProperties;
-        if (drop.variant === 'rainbow') {
-          return <div key={drop.id} className="rain-drop rain-drop-rainbow" style={style} />;
-        }
-        const cls = drop.variant === 'golden' ? ' rain-drop-golden'
-                  : drop.variant === 'galaxy' ? ' rain-drop-galaxy' : '';
-        return <img key={drop.id} src={drop.src} alt="" draggable={false} className={`rain-drop${cls}`} style={style} />;
-      })}
+      {rainDrops.map(drop => (
+        <img
+          key={drop.id}
+          src={drop.src}
+          alt=""
+          draggable={false}
+          className={`rain-drop${drop.golden ? ' rain-drop-golden' : ''}`}
+          style={{
+            left: `${drop.x}vw`,
+            width: drop.size,
+            height: drop.size,
+            animationDuration: `${drop.duration}s`,
+            animationDelay: `${drop.delay}s`,
+            '--drift': `${drop.drift}px`,
+            top: goldenEventActive ? '40px' : '0',
+          } as React.CSSProperties}
+        />
+      ))}
     </div>
   );
 }
