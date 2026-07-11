@@ -331,6 +331,26 @@ export default function Game() {
   const shopDiscount = levelDiscount(level);          // cheaper shop
   const priceOf = (base: number) => Math.max(0, Math.ceil(base * (1 - shopDiscount)));
 
+  // Price display: when a level discount is active, show the original price
+  // struck through, the discounted price, and a "-N%" badge so it reads clearly
+  // as a discount. No discount → just the plain price.
+  const priceLabel = (base: number, verb: string) => {
+    const p = priceOf(base);
+    if (shopDiscount > 0 && base > 0) {
+      return (
+        <span className="inline-flex items-center gap-1.5 flex-wrap justify-center">
+          <span>{verb}:</span>
+          <span className="line-through opacity-60">{formatNumber(base)}</span>
+          <span>{formatNumber(p)}</span>
+          <span className="text-[10px] font-black bg-green-500 text-white px-1.5 py-0.5 rounded-full leading-none">
+            -{Math.round(shopDiscount * 100)}%
+          </span>
+        </span>
+      );
+    }
+    return <>{verb}: {formatNumber(p)}</>;
+  };
+
   const clickValue = (
     1
     + state.upgrades.betterPetting.level
@@ -819,7 +839,7 @@ export default function Game() {
                   }`}
                   data-testid={`button-upgrade-${key}`}
                 >
-                  Buy for {formatNumber(price)}
+                  {priceLabel(upgState.cost, 'Buy for')}
                 </button>
               </div>
             );
@@ -976,16 +996,16 @@ export default function Game() {
                                 Select
                               </button>
                             ) : (
-                              <button 
+                              <button
                                 onClick={() => buyClicker(c.id, c.cost)}
                                 disabled={!canAfford}
                                 className={`w-full py-2.5 rounded-xl text-sm font-black transition-all border-2 active:scale-95 ${
-                                  canAfford 
-                                    ? 'bg-primary text-primary-foreground border-primary-foreground/20 hover:brightness-110' 
+                                  canAfford
+                                    ? 'bg-primary text-primary-foreground border-primary-foreground/20 hover:brightness-110'
                                     : 'bg-muted text-muted-foreground border-transparent cursor-not-allowed active:scale-100'
                                 }`}
                               >
-                                Unlock: {formatNumber(price)}
+                                {priceLabel(c.cost, 'Unlock')}
                               </button>
                             )}
                           </div>
@@ -1035,16 +1055,16 @@ export default function Game() {
                                 Select
                               </button>
                             ) : (
-                              <button 
+                              <button
                                 onClick={() => buyTheme(t.id, t.cost)}
                                 disabled={!canAfford}
                                 className={`w-full py-2.5 rounded-xl text-sm font-black transition-all border-2 active:scale-95 ${
-                                  canAfford 
-                                    ? 'bg-primary text-primary-foreground border-primary-foreground/20 hover:brightness-110' 
+                                  canAfford
+                                    ? 'bg-primary text-primary-foreground border-primary-foreground/20 hover:brightness-110'
                                     : 'bg-muted text-muted-foreground border-transparent cursor-not-allowed active:scale-100'
                                 }`}
                               >
-                                Unlock: {formatNumber(price)}
+                                {priceLabel(t.cost, 'Unlock')}
                               </button>
                             )}
                           </div>
@@ -1101,12 +1121,12 @@ export default function Game() {
                               onClick={() => buySound(s.id, s.cost)}
                               disabled={!canAfford}
                               className={`w-full py-2 rounded-xl text-sm font-black transition-all border-2 active:scale-95 ${
-                                canAfford 
-                                  ? 'bg-primary text-primary-foreground border-primary-foreground/20 hover:brightness-110' 
+                                canAfford
+                                  ? 'bg-primary text-primary-foreground border-primary-foreground/20 hover:brightness-110'
                                   : 'bg-muted text-muted-foreground border-transparent cursor-not-allowed active:scale-100'
                               }`}
                             >
-                              Unlock: {formatNumber(price)}
+                              {priceLabel(s.cost, 'Unlock')}
                             </button>
                           )}
                         </div>
