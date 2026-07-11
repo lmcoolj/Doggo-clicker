@@ -321,6 +321,7 @@ export default function Game() {
   const [adminMsg, setAdminMsg] = useState<{ text: string; ok: boolean } | null>(null);
   const adminVerifiedPw = useRef('');
   const stateRef = useRef(state);
+  const [lastSaved, setLastSaved] = useState(0); // ms epoch of the last successful auto-save
 
   // ── Events (Golden / Rainbow / Galaxy Hour) — server-driven ─────────────
   const [activeEvent, setActiveEvent] = useState<EventId | null>(null);
@@ -329,11 +330,42 @@ export default function Game() {
   const eventRef = useRef<EventId | null>(null);        // current event id
   const eventEndsAt = useRef(0);                        // ms epoch the current event ends
   
-  // Persist and keep ref updated
+  // ── Auto-save ────────────────────────────────────────────
+  // Saves on every change, on a periodic heartbeat, and whenever the tab is
+  // hidden or closed (important on mobile, where closing a tab may not fire a
+  // normal unload). Wrapped in try/catch so a storage failure never crashes the
+  // game (e.g. Safari private mode returns quota errors on write).
+  const saveGame = () => {
+    try {
+      localStorage.setItem('doggoClickerState', JSON.stringify(stateRef.current));
+      setLastSaved(Date.now());
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  // Save on every state change (and keep the ref current for the savers below)
   useEffect(() => {
     stateRef.current = state;
-    localStorage.setItem('doggoClickerState', JSON.stringify(state));
+    saveGame();
   }, [state]);
+
+  // Heartbeat + save-on-hide/close, set up once
+  useEffect(() => {
+    const interval = setInterval(saveGame, 15_000);
+    const onVisibility = () => { if (document.visibilityState === 'hidden') saveGame(); };
+    document.addEventListener('visibilitychange', onVisibility);
+    window.addEventListener('pagehide', saveGame);
+    window.addEventListener('beforeunload', saveGame);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener('pagehide', saveGame);
+      window.removeEventListener('beforeunload', saveGame);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const rebirthMult = 1 + state.rebirths * 0.5;
   const activeClickerDef = CLICKERS.find(c => c.id === state.activeClicker) || CLICKERS[0];
@@ -765,8 +797,16 @@ export default function Game() {
             className="hidden"
             onChange={importSave}
           />
+          <div
+            className="hidden sm:flex items-center gap-1.5 ml-1 px-2.5 py-1 rounded-full bg-white/10 text-xs font-bold"
+            title={lastSaved ? `Progress auto-saved at ${new Date(lastSaved).toLocaleTimeString()}` : 'Auto-save is on'}
+            data-testid="autosave-indicator"
+          >
+            <span className={lastSaved ? 'text-green-300' : 'opacity-70'}>●</span>
+            <span className="opacity-90">Auto-saved</span>
+          </div>
         </div>
-        
+
         <div className="flex items-center gap-6">
           <div
             className="flex flex-col items-center justify-center bg-white/20 px-3 py-1 rounded-lg min-w-[110px]"
