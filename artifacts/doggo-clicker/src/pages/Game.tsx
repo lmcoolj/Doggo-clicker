@@ -119,28 +119,16 @@ const SOUNDS = [
 ];
 
 // ── Events ("Hours") ─────────────────────────────────────────────────────────
-// Three escalating events. Each is better than the last. They run client-side on
-// a deterministic wall-clock schedule (so all players sync) and can also be
-// triggered on demand from the admin panel.
+// Three escalating events. Each is better than the last. Timing lives on the
+// server (see api-server) so every player is in sync; the admin panel triggers
+// an event for everyone. The client just polls for the current event and renders
+// its multiplier, banner, rain, and theme.
 type EventId = 'golden' | 'rainbow' | 'galaxy';
 const EVENTS: Record<EventId, { name: string; emoji: string; mult: number; banner: string }> = {
   golden:  { name: 'Golden Hour',  emoji: '✨', mult: 5,  banner: '5× multiplier active!' },
   rainbow: { name: 'Rainbow Hour', emoji: '🌈', mult: 10, banner: '10× multiplier + rainbow rain!' },
   galaxy:  { name: 'Galaxy Hour',  emoji: '🌌', mult: 20, banner: '20× multiplier · every animal rains!' },
 };
-const EVENT_CYCLE_MS = 15 * 60 * 1000;   // event windows are checked every 15 min…
-const EVENT_DURATION_MS = 3 * 60 * 1000; // …and last 3 minutes
-// How rare each event is, measured in cycles. The stronger the event, the rarer.
-// Checked rarest-first so the better event wins when periods line up.
-const EVENT_PERIOD: Record<EventId, number> = {
-  golden: 4,    // roughly once an hour
-  rainbow: 12,  // roughly once every 3 hours
-  galaxy: 32,   // roughly once every 8 hours
-};
-
-// Admin gate for manually starting an event. This is a toy game running entirely
-// in the browser, so the check is client-side (and therefore not a real secret).
-const ADMIN_PASSWORD = 'tengir72';
 
 interface UpgState { level: number; cost: number; }
 
@@ -331,16 +319,15 @@ export default function Game() {
   const [adminPwInput, setAdminPwInput] = useState('');
   const [adminPwError, setAdminPwError] = useState(false);
   const [adminMsg, setAdminMsg] = useState<{ text: string; ok: boolean } | null>(null);
+  const adminVerifiedPw = useRef('');
   const stateRef = useRef(state);
 
-  // ── Events (Golden / Rainbow / Galaxy Hour) ─────────────
+  // ── Events (Golden / Rainbow / Galaxy Hour) — server-driven ─────────────
   const [activeEvent, setActiveEvent] = useState<EventId | null>(null);
   const [eventSecondsLeft, setEventSecondsLeft] = useState(0);
   const eventMultRef = useRef(1);                       // current event multiplier (1 when none)
   const eventRef = useRef<EventId | null>(null);        // current event id
   const eventEndsAt = useRef(0);                        // ms epoch the current event ends
-  const eventManualId = useRef<EventId | null>(null);   // admin-triggered event…
-  const eventManualEndsAt = useRef(0);                  // …runs until this ms epoch
   
   // Persist and keep ref updated
   useEffect(() => {
@@ -422,46 +409,32 @@ export default function Game() {
     return () => clearInterval(interval);
   }, []);
 
-  // ── Events: deterministic client-side schedule (+ manual admin trigger) ──
-  // The schedule is a pure function of the wall clock, so every player enters the
-  // same event at the same real-world time — no server needed.
+  // ── Events: poll the server so every player is in sync ──
+  // The server owns the schedule and the admin trigger, so an event started by
+  // the admin (or on the server's own timer) reaches everyone within a poll.
   useEffect(() => {
-    const evaluate = () => {
-      const now = Date.now();
-      let ev: EventId | null;
-      let endsAt: number;
+    const poll = async () => {
+      try {
+        const res = await fetch('/api/events');
+        if (!res.ok) return;
+        const data: { active: boolean; event: EventId | null; endsAt: number } = await res.json();
+        const ev = data.active ? data.event : null;
 
-      if (eventManualEndsAt.current > now && eventManualId.current) {
-        // Admin-triggered event takes precedence while it lasts
-        ev = eventManualId.current;
-        endsAt = eventManualEndsAt.current;
-      } else {
-        const phase = now % EVENT_CYCLE_MS;
-        if (phase < EVENT_DURATION_MS) {
-          const cycle = Math.floor(now / EVENT_CYCLE_MS);
-          if (cycle % EVENT_PERIOD.galaxy === 0) ev = 'galaxy';
-          else if (cycle % EVENT_PERIOD.rainbow === 0) ev = 'rainbow';
-          else if (cycle % EVENT_PERIOD.golden === 0) ev = 'golden';
-          else ev = null;
-          endsAt = ev ? now - phase + EVENT_DURATION_MS : 0;
-        } else {
-          ev = null;
-          endsAt = 0;
+        if (ev !== eventRef.current) {
+          eventRef.current = ev;
+          eventEndsAt.current = data.endsAt || 0;
+          eventMultRef.current = ev ? EVENTS[ev].mult : 1;
+          setActiveEvent(ev);
+        } else if (ev) {
+          eventEndsAt.current = data.endsAt;
         }
-      }
-
-      if (ev !== eventRef.current) {
-        eventRef.current = ev;
-        eventEndsAt.current = endsAt;
-        eventMultRef.current = ev ? EVENTS[ev].mult : 1;
-        setActiveEvent(ev);
-      } else if (ev) {
-        eventEndsAt.current = endsAt;
+      } catch {
+        // Server unreachable — keep current state (no event)
       }
     };
 
-    evaluate();
-    const interval = setInterval(evaluate, 1_000);
+    poll();
+    const interval = setInterval(poll, 3_000);
     return () => clearInterval(interval);
   }, []);
 
@@ -685,29 +658,45 @@ export default function Game() {
     e.target.value = '';
   };
 
-  // ── Admin handlers (client-side; a static site has no server) ────────────
-  const adminLogin = () => {
+  // ── Admin handlers (verified against the server) ─────────────────────────
+  const adminLogin = async () => {
     setAdminMsg(null);
-    if (adminPwInput === ADMIN_PASSWORD) {
+    try {
+      const res = await fetch('/api/admin/trigger-event', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        // Validate the password without triggering anything
+        body: JSON.stringify({ password: adminPwInput, checkOnly: true }),
+      });
+      if (res.status === 401) {
+        setAdminPwError(true);
+        return;
+      }
+      adminVerifiedPw.current = adminPwInput;
       setAdminAuthed(true);
       setAdminPwError(false);
       setAdminPwInput('');
-    } else {
+    } catch {
       setAdminPwError(true);
     }
   };
 
-  const triggerEvent = (id: EventId) => {
-    // Start the chosen event right now. The scheduler keeps it running until
-    // eventManualEndsAt passes.
-    const endsAt = Date.now() + EVENT_DURATION_MS;
-    eventManualId.current = id;
-    eventManualEndsAt.current = endsAt;
-    eventRef.current = id;
-    eventEndsAt.current = endsAt;
-    eventMultRef.current = EVENTS[id].mult;
-    setActiveEvent(id);
-    setAdminMsg({ text: `✅ ${EVENTS[id].name} started! ${EVENTS[id].mult}× for 3 minutes.`, ok: true });
+  const triggerEvent = async (id: EventId) => {
+    setAdminMsg(null);
+    try {
+      const res = await fetch('/api/admin/trigger-event', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: adminVerifiedPw.current, event: id }),
+      });
+      if (res.ok) {
+        setAdminMsg({ text: `✅ ${EVENTS[id].name} triggered for everyone!`, ok: true });
+      } else {
+        setAdminMsg({ text: '❌ Server rejected the request.', ok: false });
+      }
+    } catch {
+      setAdminMsg({ text: '❌ Could not reach the server.', ok: false });
+    }
   };
 
   const rebirthThreshold = 1_000_000 * Math.pow(10, state.rebirths);
@@ -1290,7 +1279,7 @@ export default function Game() {
                 <div className="bg-muted rounded-xl p-4 flex flex-col gap-3">
                   <div>
                     <p className="font-black text-sm">⚡ Trigger an Event</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">Starts a 3-minute event right now. Events also run automatically for the first 3 minutes of each quarter-hour.</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">Starts a 3-minute event for all players immediately. Events also occur on their own at random.</p>
                   </div>
                   {(Object.keys(EVENTS) as EventId[]).map(id => (
                     <button
