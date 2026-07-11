@@ -128,10 +128,15 @@ const EVENTS: Record<EventId, { name: string; emoji: string; mult: number; banne
   rainbow: { name: 'Rainbow Hour', emoji: '🌈', mult: 10, banner: '10× multiplier + rainbow rain!' },
   galaxy:  { name: 'Galaxy Hour',  emoji: '🌌', mult: 20, banner: '20× multiplier · every animal rains!' },
 };
-const EVENT_CYCLE_MS = 15 * 60 * 1000;   // an event window opens every 15 min…
-const EVENT_DURATION_MS = 3 * 60 * 1000; // …and lasts 3 minutes
-// Which event fires each cycle (deterministic). Golden common, galaxy rarest.
-const EVENT_ROTATION: EventId[] = ['golden', 'golden', 'rainbow', 'golden', 'rainbow', 'galaxy'];
+const EVENT_CYCLE_MS = 15 * 60 * 1000;   // event windows are checked every 15 min…
+const EVENT_DURATION_MS = 3 * 60 * 1000; // …and last 3 minutes
+// How rare each event is, measured in cycles. The stronger the event, the rarer.
+// Checked rarest-first so the better event wins when periods line up.
+const EVENT_PERIOD: Record<EventId, number> = {
+  golden: 4,    // roughly once an hour
+  rainbow: 12,  // roughly once every 3 hours
+  galaxy: 32,   // roughly once every 8 hours
+};
 
 // Admin gate for manually starting an event. This is a toy game running entirely
 // in the browser, so the check is client-side (and therefore not a real secret).
@@ -433,8 +438,12 @@ export default function Game() {
       } else {
         const phase = now % EVENT_CYCLE_MS;
         if (phase < EVENT_DURATION_MS) {
-          ev = EVENT_ROTATION[Math.floor(now / EVENT_CYCLE_MS) % EVENT_ROTATION.length];
-          endsAt = now - phase + EVENT_DURATION_MS;
+          const cycle = Math.floor(now / EVENT_CYCLE_MS);
+          if (cycle % EVENT_PERIOD.galaxy === 0) ev = 'galaxy';
+          else if (cycle % EVENT_PERIOD.rainbow === 0) ev = 'rainbow';
+          else if (cycle % EVENT_PERIOD.golden === 0) ev = 'golden';
+          else ev = null;
+          endsAt = ev ? now - phase + EVENT_DURATION_MS : 0;
         } else {
           ev = null;
           endsAt = 0;
