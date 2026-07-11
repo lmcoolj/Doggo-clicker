@@ -11,6 +11,31 @@ function formatNumber(n: number): string {
   return Math.floor(n).toString();
 }
 
+// ── Leveling ─────────────────────────────────────────────────────────────────
+// XP is lifetime doggos earned (it survives rebirths). Each level costs 25% more
+// XP than the last. Higher level → bigger click/income multiplier and a growing
+// discount on everything in the shop.
+const LEVEL_BASE_XP = 50;     // XP to go from level 1 → 2
+const LEVEL_GROWTH = 1.25;    // each level needs 25% more than the previous
+const LEVEL_CLICK_BONUS = 0.02; // +2% click & income per level
+const LEVEL_DISCOUNT_STEP = 0.015; // 1.5% cheaper shop per level…
+const LEVEL_DISCOUNT_MAX = 0.75;   // …capped at 75% off
+
+function levelInfo(xp: number): { level: number; into: number; need: number } {
+  let level = 1;
+  let need = LEVEL_BASE_XP;
+  let acc = 0; // total XP at the start of the current level
+  while (xp >= acc + need) {
+    acc += need;
+    level++;
+    need = Math.floor(need * LEVEL_GROWTH);
+  }
+  return { level, into: xp - acc, need };
+}
+
+const levelClickMult = (level: number) => 1 + (level - 1) * LEVEL_CLICK_BONUS;
+const levelDiscount = (level: number) => Math.min(LEVEL_DISCOUNT_MAX, (level - 1) * LEVEL_DISCOUNT_STEP);
+
 const CLICKERS = [
   { id: 'doggo',          cost: 0,                mult: 1,    name: 'Doggo' },
   { id: 'tung-tung-sahur',cost: 0,                mult: 1,    name: 'Tung Tung Tung Sahur' },
@@ -30,18 +55,22 @@ const CLICKERS = [
   { id: 'lion',           cost: 30_000,           mult: 1.65, name: 'Lion' },
   { id: 'armadillo',      cost: 35_000,           mult: 1.67, name: 'Armadillo' },
   { id: 'kiwi',           cost: 40_000,           mult: 1.7,  name: 'Kiwi' },
+  { id: 'emu',            cost: 45_000,           mult: 1.72, name: 'Emu' },
   { id: 'panda',          cost: 50_000,           mult: 1.75, name: 'Panda' },
   { id: 'blue-jay',       cost: 60_000,           mult: 1.8,  name: 'Blue Jay' },
   { id: 'pufferfish',     cost: 75_000,           mult: 1.85, name: 'Puffer Fish' },
   { id: 'chinchilla',     cost: 90_000,           mult: 1.88, name: 'Chinchilla' },
   { id: 'toad',           cost: 125_000,          mult: 1.95, name: 'Toad' },
+  { id: 'jellyfish',      cost: 150_000,          mult: 1.98, name: 'Jellyfish' },
   { id: 'puffin',         cost: 175_000,          mult: 2,    name: 'Puffin' },
   { id: 'dolphin',        cost: 220_000,          mult: 2.1,  name: 'Dolphin' },
   { id: 'shark',          cost: 260_000,          mult: 2.2,  name: 'Shark' },
+  { id: 'elephant',       cost: 280_000,          mult: 2.25, name: 'Elephant' },
   { id: 'octopus',        cost: 300_000,          mult: 2.3,  name: 'Octopus',         rare: true },
   { id: 'blue-whale',     cost: 420_000,          mult: 2.45, name: 'Blue Whale',      rare: true },
   { id: 'red-panda',      cost: 550_000,          mult: 2.55, name: 'Red Panda',       rare: true },
   { id: 'flamingo',       cost: 650_000,          mult: 2.65, name: 'Flamingo',        rare: true },
+  { id: 'peacock',        cost: 700_000,          mult: 2.7,  name: 'Peacock',         rare: true },
   { id: 'axolotl',        cost: 800_000,          mult: 2.8,  name: 'Axolotl',         rare: true },
   { id: 'money-axolotl',  cost: 900_000,          mult: 2.9,  name: 'Money Axolotl',   rare: true },
   { id: 'orca',           cost: 1_000_000,        mult: 3.0,  name: 'Orca',            rare: true },
@@ -92,6 +121,7 @@ interface UpgState { level: number; cost: number; }
 interface GameState {
   doggos: number;
   totalDoggosEarned: number;
+  xp: number;
   upgrades: {
     betterPetting:  UpgState;
     autoWalker:     UpgState;
@@ -115,6 +145,7 @@ interface GameState {
 const DEFAULT_STATE: GameState = {
   doggos: 0,
   totalDoggosEarned: 0,
+  xp: 0,
   upgrades: {
     betterPetting:  { level: 0, cost: UPGRADES_META.betterPetting.baseCost },
     autoWalker:     { level: 0, cost: UPGRADES_META.autoWalker.baseCost },
@@ -294,12 +325,18 @@ export default function Game() {
   const goldenMult = goldenEventActive ? 5 : 1;
   goldenMultRef.current = goldenMult;
 
+  // ── Level & its perks ──────────────────────────────────────
+  const { level, into: xpInto, need: xpNeed } = levelInfo(state.xp);
+  const levelMult = levelClickMult(level);            // boosts click power & income
+  const shopDiscount = levelDiscount(level);          // cheaper shop
+  const priceOf = (base: number) => Math.max(0, Math.ceil(base * (1 - shopDiscount)));
+
   const clickValue = (
     1
     + state.upgrades.betterPetting.level
     + state.upgrades.goldenLeash.level * 3
     + state.upgrades.cosmicBone.level * 20
-  ) * activeClickerDef.mult * rebirthMult * goldenMult;
+  ) * activeClickerDef.mult * rebirthMult * goldenMult * levelMult;
 
   const dps = (
     state.upgrades.autoWalker.level * 0.5
@@ -308,13 +345,14 @@ export default function Game() {
     + state.upgrades.biscuitFactory.level * 25
     + state.upgrades.dogWhisperer.level * 100
     + state.upgrades.cosmicBone.level * 500
-  ) * rebirthMult * goldenMult;
+  ) * rebirthMult * goldenMult * levelMult;
 
   // Passive Income loop
   useEffect(() => {
     const interval = setInterval(() => {
       const s = stateRef.current;
       const currentRebirthMult = 1 + s.rebirths * 0.5;
+      const currentLevelMult = levelClickMult(levelInfo(s.xp).level);
       const currentDps = (
         s.upgrades.autoWalker.level * 0.5
         + s.upgrades.treatDispenser.level * 5
@@ -322,13 +360,14 @@ export default function Game() {
         + s.upgrades.biscuitFactory.level * 25
         + s.upgrades.dogWhisperer.level * 100
         + s.upgrades.cosmicBone.level * 500
-      ) * currentRebirthMult * goldenMultRef.current;
-      
+      ) * currentRebirthMult * goldenMultRef.current * currentLevelMult;
+
       if (currentDps > 0) {
         setState(prev => ({
           ...prev,
           doggos: prev.doggos + currentDps,
-          totalDoggosEarned: prev.totalDoggosEarned + currentDps
+          totalDoggosEarned: prev.totalDoggosEarned + currentDps,
+          xp: prev.xp + currentDps
         }));
       }
     }, 1000);
@@ -414,7 +453,8 @@ export default function Game() {
     setState(prev => ({
       ...prev,
       doggos: prev.doggos + clickValue,
-      totalDoggosEarned: prev.totalDoggosEarned + clickValue
+      totalDoggosEarned: prev.totalDoggosEarned + clickValue,
+      xp: prev.xp + clickValue
     }));
 
     setFloaters(prev => [...prev, { id, x, y, val: clickValue }]);
@@ -451,12 +491,13 @@ export default function Game() {
   const buyUpgrade = (upgradeKey: keyof GameState['upgrades']) => {
     setState(prev => {
       const upg = prev.upgrades[upgradeKey];
-      if (prev.doggos >= upg.cost) {
+      const price = priceOf(upg.cost);
+      if (prev.doggos >= price) {
         const nextLevel = upg.level + 1;
         const nextCost = UPGRADES_META[upgradeKey].getCost(nextLevel);
         return {
           ...prev,
-          doggos: prev.doggos - upg.cost,
+          doggos: prev.doggos - price,
           upgrades: {
             ...prev.upgrades,
             [upgradeKey]: { level: nextLevel, cost: nextCost }
@@ -468,11 +509,12 @@ export default function Game() {
   };
 
   const buyClicker = (clickerId: string, cost: number) => {
+    const price = priceOf(cost);
     setState(prev => {
-      if (!prev.unlockedClickers.includes(clickerId) && prev.doggos >= cost) {
+      if (!prev.unlockedClickers.includes(clickerId) && prev.doggos >= price) {
         return {
           ...prev,
-          doggos: prev.doggos - cost,
+          doggos: prev.doggos - price,
           unlockedClickers: [...prev.unlockedClickers, clickerId],
           activeClicker: clickerId
         };
@@ -486,11 +528,12 @@ export default function Game() {
   };
 
   const buyTheme = (themeId: string, cost: number) => {
+    const price = priceOf(cost);
     setState(prev => {
-      if (!prev.unlockedThemes.includes(themeId) && prev.doggos >= cost) {
+      if (!prev.unlockedThemes.includes(themeId) && prev.doggos >= price) {
         return {
           ...prev,
-          doggos: prev.doggos - cost,
+          doggos: prev.doggos - price,
           unlockedThemes: [...prev.unlockedThemes, themeId],
           activeTheme: themeId
         };
@@ -504,11 +547,12 @@ export default function Game() {
   };
 
   const buySound = (soundId: string, cost: number) => {
+    const price = priceOf(cost);
     setState(prev => {
-      if (!prev.unlockedSounds.includes(soundId) && prev.doggos >= cost) {
+      if (!prev.unlockedSounds.includes(soundId) && prev.doggos >= price) {
         return {
           ...prev,
-          doggos: prev.doggos - cost,
+          doggos: prev.doggos - price,
           unlockedSounds: [...prev.unlockedSounds, soundId],
           activeSound: soundId
         };
@@ -682,6 +726,18 @@ export default function Game() {
         </div>
         
         <div className="flex items-center gap-6">
+          <div
+            className="flex flex-col items-center justify-center bg-white/20 px-3 py-1 rounded-lg min-w-[110px]"
+            title={`Level ${level} perks: ×${levelMult.toFixed(2)} click & income · ${Math.round(shopDiscount * 100)}% off the shop\n${formatNumber(xpInto)} / ${formatNumber(xpNeed)} XP to level ${level + 1}`}
+            data-testid="level-badge"
+          >
+            <span className="text-xs font-bold uppercase opacity-90 tracking-wider">Level {level}</span>
+            <div className="w-full h-1.5 bg-black/20 rounded-full mt-1 overflow-hidden">
+              <div className="h-full bg-white rounded-full transition-all duration-300" style={{ width: `${Math.min(100, (xpInto / xpNeed) * 100)}%` }} />
+            </div>
+            <span className="text-[10px] font-black opacity-90 mt-0.5 tabular-nums">×{levelMult.toFixed(2)} · {Math.round(shopDiscount * 100)}% off</span>
+          </div>
+
           {state.rebirths > 0 && (
             <div className="flex flex-col items-center justify-center bg-white/20 px-3 py-1 rounded-lg">
               <span className="text-xs font-bold uppercase opacity-90 tracking-wider">Rebirths</span>
@@ -735,7 +791,8 @@ export default function Game() {
           {(Object.keys(UPGRADES_META) as Array<keyof typeof UPGRADES_META>).map(key => {
             const meta = UPGRADES_META[key];
             const upgState = state.upgrades[key];
-            const canAfford = state.doggos >= upgState.cost;
+            const price = priceOf(upgState.cost);
+            const canAfford = state.doggos >= price;
             
             return (
               <div key={key} className="bg-background rounded-2xl p-4 border-2 border-border shadow-sm flex flex-col gap-3">
@@ -762,7 +819,7 @@ export default function Game() {
                   }`}
                   data-testid={`button-upgrade-${key}`}
                 >
-                  Buy for {formatNumber(upgState.cost)}
+                  Buy for {formatNumber(price)}
                 </button>
               </div>
             );
@@ -865,7 +922,8 @@ export default function Game() {
                   {CLICKERS.map(c => {
                     const isUnlocked = state.unlockedClickers.includes(c.id);
                     const isActive = state.activeClicker === c.id;
-                    const canAfford = state.doggos >= c.cost;
+                    const price = priceOf(c.cost);
+                    const canAfford = state.doggos >= price;
                     
                     return (
                       <div 
@@ -927,7 +985,7 @@ export default function Game() {
                                     : 'bg-muted text-muted-foreground border-transparent cursor-not-allowed active:scale-100'
                                 }`}
                               >
-                                Unlock: {formatNumber(c.cost)}
+                                Unlock: {formatNumber(price)}
                               </button>
                             )}
                           </div>
@@ -942,7 +1000,8 @@ export default function Game() {
                   {THEMES.map(t => {
                     const isUnlocked = state.unlockedThemes.includes(t.id);
                     const isActive = state.activeTheme === t.id;
-                    const canAfford = state.doggos >= t.cost;
+                    const price = priceOf(t.cost);
+                    const canAfford = state.doggos >= price;
                     
                     return (
                       <div 
@@ -985,7 +1044,7 @@ export default function Game() {
                                     : 'bg-muted text-muted-foreground border-transparent cursor-not-allowed active:scale-100'
                                 }`}
                               >
-                                Unlock: {formatNumber(t.cost)}
+                                Unlock: {formatNumber(price)}
                               </button>
                             )}
                           </div>
@@ -1000,7 +1059,8 @@ export default function Game() {
                   {SOUNDS.map(s => {
                     const isUnlocked = state.unlockedSounds.includes(s.id);
                     const isActive = state.activeSound === s.id;
-                    const canAfford = state.doggos >= s.cost;
+                    const price = priceOf(s.cost);
+                    const canAfford = state.doggos >= price;
 
                     return (
                       <div 
@@ -1046,7 +1106,7 @@ export default function Game() {
                                   : 'bg-muted text-muted-foreground border-transparent cursor-not-allowed active:scale-100'
                               }`}
                             >
-                              Unlock: {formatNumber(s.cost)}
+                              Unlock: {formatNumber(price)}
                             </button>
                           )}
                         </div>
